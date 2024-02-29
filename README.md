@@ -1,13 +1,9 @@
 
-Final Project Outline
-
-Yuehao Gao
+Final Project Outline - Yuehao Gao
 
 University of California, Santa Barbara
 
-MAT201B
-
-Professor Karl Yerkes
+MAT201B, Professor Karl Yerkes
 
 
 For my final project of this course, I aim to accomplish a 3D audio visualizer. Based on the
