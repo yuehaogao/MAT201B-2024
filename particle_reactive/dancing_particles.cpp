@@ -224,9 +224,12 @@ struct MyApp : App {
       ///*
       if (stft(io.out(0))) { 
         // Loop through all the frequency bins
+        //int testing = 0;
         for (unsigned k = 0; k < stft.numBins(); ++k) {
-          spectrum[k] = 10.0 * tanh(pow(stft.bin(k).real(), 1.5) );
+          spectrum[k] = 8.0 * tanh(pow(stft.bin(k).real(), 1.5));
+          //testing++;
         }
+        //cout << testing;
       }
       /*
       if (stft(io.out(1))) { 
@@ -320,7 +323,10 @@ struct MyApp : App {
 
       // Important: add the force excerted by audio
       float musicForce = 0.0;
-      int positionInSpectrum = (int) (FFT_SIZE * 0.7 * ((pattern1OriginalPosition[i].y + pattern1CylinderHalfLength) / (2 * pattern1CylinderHalfLength)));
+      
+      int positionInSpectrum = std::floor(i / 50);
+      //int positionInSpectrum = std::floor(((pattern1PositionVec[i].y + 0.6) / 1.2) * 2025);
+      //int positionInSpectrum = (int) (FFT_SIZE * 0.5 * ((pattern1PositionVec[i].y + pattern1CylinderHalfLength) / (2 * pattern1CylinderHalfLength))) - 0.5 * FFT_SIZE;
       /*
       if (pattern1OriginalPosition[i].x < 0) {
         musicForce = spectrumL[positionInSpectrum];
