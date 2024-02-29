@@ -192,18 +192,30 @@ struct MyApp : App {
   // The current frame shows which mesh(es) is depending on the "pattern" parameter
   //
   void onDraw(Graphics& g) override {
-    g.clear(0.2);
+    g.clear(0.6 * (valueL.get() + valueR.get()));
+    float redColorChange = 5.0 * valueL.get();
+    if (redColorChange > 2.0) {
+      redColorChange = 2.0;
+    }
+    float blueColorChange = 5.0 * valueR.get();
+    if (blueColorChange > 2.0) {
+      blueColorChange = 2.0;
+    } 
     switch((int)pattern.get()) {
       case 0:
         g.pushMatrix();
         g.translate(-0.1, 0, 0);
-        g.scale(sphereSize * valueL.get());
+        g.scale(sphereSize * valueL.get() * 0.5);
+        
+        g.color(RGB(1.0, 1.0 - redColorChange * redColorChange, 1.0 - redColorChange * redColorChange));
         g.draw(pattern0SphereL);
         g.popMatrix();
 
         g.pushMatrix();
         g.translate(0.1, 0, 0);
-        g.scale(sphereSize * valueR.get()); 
+        g.scale(sphereSize * valueR.get() * 0.5);
+        
+        g.color(RGB(1.0 - blueColorChange * blueColorChange, 1.0, 1.0 - blueColorChange * blueColorChange));
         g.draw(pattern0SphereR);
         g.popMatrix();
         break;
