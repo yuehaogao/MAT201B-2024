@@ -23,41 +23,48 @@ using namespace al;
 
 const float sphereSize = 0.8;
 
-const int pattern1CylinderHeight = 45;
-const float pattern1CylinderHalfLength = 0.12;
-const int pattern1CylinderNumParticlePerlayer = 40;
-const float pattern1CylinderRadius = 0.06;
+const int pattern1CylinderHeight = 75;
+const float pattern1CylinderHalfLength = 0.6;
+const int pattern1CylinderNumParticlePerlayer = 50;
+const float pattern1CylinderRadius = 0.25;
 const float pattern1AngleIncrement = 2.0 * M_PI / pattern1CylinderNumParticlePerlayer;
 
 const int pattern2BallNumParticle = 1000;
 
+// Common-used statements or parameters
 struct CommonState {
   Vec3f pattern1Position[17000];
+  Vec3f pattern2Position[17000];
   int size;
   Nav nav;
   float pointSize;
 };
 
-
+// To generate a random 3D vector for position, color, ...
 Vec3f randomVec3f(float scale) {
   return Vec3f(rnd::uniformS(), rnd::uniformS(), rnd::uniformS()) * scale;
 }
+
+// To slurp a file (initialized)
 string slurp(string fileName);  // forward declaration
+
+
 
 // -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
 
 struct MyApp : App {
-  // ----------- All parameters -----------
+  // ----------- All parameters Start -----------
   Parameter valueL{"value_left", 0, 0, 1};
   Parameter valueR{"value_right", 0, 0, 1};
-  Parameter pattern{"visual_pattern", 0, 0, 3};
-  Parameter pointSize{"/pointSize", "", 0.15, 0.05, 1.0};
-  Parameter timeStep{"/timeStep", "", 0.0, 0.0, 1.0};
+  Parameter pattern{"visual_pattern", 0, 0, 3};     // This will be limited to int only
+  Parameter pointSize{"/pointSize", "", 0.3, 0.1, 1.5};
+  Parameter timeStep{"/timeStep", "", 0.5, 0.0, 1.0};
   Parameter dragFactor{"/dragFactor", "", 0.1, 0.0, 0.9};
   Parameter springConstant{"/springConstant", "", 0.3, 0.1, 1.0};
+  Parameter sphereRadius{"/sphereRadius", "", 2.0, 0.5, 4.0};
   Parameter repellingConstant{"/repellingConstant", "", 0.0, 0.0, 0.01};
-  // ----------- All parameters -----------
+  // --------------------------------------------
 
   // The sample player for 1 sound track only
   // The envelop follower for the left and right channel
@@ -81,6 +88,7 @@ struct MyApp : App {
 
   // * Pattern 2:
   //Mesh pattern2ParticleBall;
+  //Vec3f pattern2SphereCenter = {0.0, 0.0, 0.0};
 
   // * Pattern 3:
 
@@ -90,8 +98,10 @@ struct MyApp : App {
   // When the app is first initialized
   //
   void onInit() override {
+    // Load the sound file
     player.load("../tv.mp3");
-
+    
+    // set up GUI
     auto GUIdomain = GUIDomain::enableGUI(defaultWindowDomain());
     auto& gui = GUIdomain->newGUI();
     gui.add(valueL);
@@ -101,16 +111,16 @@ struct MyApp : App {
     gui.add(pattern);
     parameterServer() << pattern;
     gui.add(pointSize);
-    parameterServer() << pointSize;  // Have this?
-    gui.add(timeStep);                    // add parameter to GUI
+    parameterServer() << pointSize;
+    gui.add(timeStep);
     parameterServer() << timeStep;
-    gui.add(dragFactor);                  // add parameter to GUI
+    gui.add(dragFactor);
     parameterServer() << dragFactor;
-    gui.add(springConstant);              // add parameter to GUI
+    gui.add(springConstant); 
     parameterServer() << springConstant;
-    //gui.add(sphereRadius);                // add parameter to GUI
-    //parameterServer() << sphereRadius;
-    gui.add(repellingConstant);           // add parameter to GUI
+    gui.add(sphereRadius);
+    parameterServer() << sphereRadius;
+    gui.add(repellingConstant);
     parameterServer() << repellingConstant;
     
   }
@@ -132,21 +142,21 @@ struct MyApp : App {
     addSphere(pattern0SphereL);
     addSphere(pattern0SphereR);
 
-    // Pattern 1: 
-    
+    // Pattern 1: create all the particles with their initial positions, colors, velocity, and forces
     pattern1ParticleCylinder.primitive(Mesh::POINTS);
   
     for (int layerIndex = 0; layerIndex < pattern1CylinderHeight; layerIndex++) {
       float y = -1.0 * pattern1CylinderHalfLength + (2.0 * pattern1CylinderHalfLength / pattern1CylinderHeight) * layerIndex;
+      
       for (int particleIndex = 0; particleIndex < pattern1CylinderNumParticlePerlayer; particleIndex++) {
         float angle = particleIndex * pattern1AngleIncrement;
         float x = pattern1CylinderRadius * cos(angle);
         float z = pattern1CylinderRadius * sin(angle);
+        pattern1ParticleCylinder.vertex(Vec3f(x, y, z));
 
         float hue = 0.7 / pattern1CylinderHeight * layerIndex;
+        pattern1ParticleCylinder.color(HSV(hue, 1.0f, 1.0f));
 
-        pattern1ParticleCylinder.vertex(Vec3f(x, y, z));
-        pattern1ParticleCylinder.color(HSV(hue, 1.0f, 1.0f));    // THIS LINE IS NOT WORKING FOR SOME REASON
         pattern1Mass.push_back(3.0);
         pattern1ParticleCylinder.texCoord(pow(3.0, 1.0f / 3), 0);
         pattern1Velocity.push_back(Vec3f(0.0, 0.0, 0.0));
@@ -154,6 +164,8 @@ struct MyApp : App {
       
       }
     }
+    // Pattern 2: ...
+    // Pattern 3: ...
     
     // ----------- Initialize Parameters for All Meshes Ends -------------
   
@@ -162,7 +174,7 @@ struct MyApp : App {
     followRight.lag(0.5);
   
     // Initialize the position of "camera"
-    nav().pos(0, 0, 0.6);
+    nav().pos(0, 0, 2.5);
   }
 
   // onSound
@@ -192,7 +204,8 @@ struct MyApp : App {
   // The current frame shows which mesh(es) is depending on the "pattern" parameter
   //
   void onDraw(Graphics& g) override {
-    g.clear(0.6 * (valueL.get() + valueR.get()));
+    // The background changes brightness according to the volume
+    g.clear(0.6 * (valueL.get() + valueR.get()) * (valueL.get() + valueR.get()) * 5.0);
     float redColorChange = 5.0 * valueL.get();
     if (redColorChange > 2.0) {
       redColorChange = 2.0;
@@ -201,26 +214,28 @@ struct MyApp : App {
     if (blueColorChange > 2.0) {
       blueColorChange = 2.0;
     } 
+
+    // Show different pattern according to the "pattern" value
     switch((int)pattern.get()) {
       case 0:
         g.pushMatrix();
-        g.translate(-0.1, 0, 0);
-        g.scale(sphereSize * valueL.get() * 0.5);
+        g.translate(-0.5, 0, 0);
+        g.scale(sphereSize * valueL.get() * 3.0);
         
         g.color(RGB(1.0, 1.0 - redColorChange * redColorChange, 1.0 - redColorChange * redColorChange));
         g.draw(pattern0SphereL);
         g.popMatrix();
 
         g.pushMatrix();
-        g.translate(0.1, 0, 0);
-        g.scale(sphereSize * valueR.get() * 0.5);
+        g.translate(0.5, 0, 0);
+        g.scale(sphereSize * valueR.get() * 3.0);
         
         g.color(RGB(1.0 - blueColorChange * blueColorChange, 1.0, 1.0 - blueColorChange * blueColorChange));
         g.draw(pattern0SphereR);
         g.popMatrix();
         break;
       case 1:
-        g.shader(pointShader);   // THIS LINE IS HAVING SOME ISSUE
+        g.shader(pointShader);
         g.shader().uniform("pointSize", pointSize / 100);
         g.blending(true);
         g.blendTrans();
@@ -248,8 +263,14 @@ struct MyApp : App {
     // Deal with all the particle forces
     vector<Vec3f> &pattern1PositionVec(pattern1ParticleCylinder.vertices());
     for (int i = 0; i < pattern1PositionVec.size(); i++) {
-      //
+      // spring force
     }
+    for (int i = 0; i < pattern1Velocity.size(); i++) {
+      pattern1Force[i] += - pattern1Velocity[i] * dragFactor;
+      pattern1Velocity[i] += pattern1Force[i] / pattern1Mass[i] * timeStep;
+      pattern1PositionVec[i] += pattern1Velocity[i] * timeStep;
+    }
+    for (auto &a : pattern1Force) a.set(0);
     
 
   }
