@@ -8,18 +8,20 @@
 //#include "al/ui/al_ControlGUI.hpp"
 #include "al/graphics/al_Shapes.hpp"
 #include "al/math/al_Functions.hpp"    // al::abs
-#include "al/ui/al_Parameter.hpp"
 #include "al/math/al_Random.hpp"
+#include "al/ui/al_Parameter.hpp"
 
-#include "Gamma/SamplePlayer.h"
 #include "Gamma/Analysis.h"
+#include "Gamma/DFT.h"
 #include "Gamma/Effects.h"
+#include "Gamma/SamplePlayer.h"
 #include <cmath>
 #include <fstream>
 #include <vector>
 
-using namespace std;
 using namespace al;
+using namespace std;
+#define FFT_SIZE 4048
 
 const float sphereSize = 0.8;
 
@@ -65,6 +67,15 @@ struct MyApp : App {
   Parameter pattern1CylinderRadius{"/cylinderRadius", "", 0.25, 0.1, 1.0};
   Parameter sphereRadius{"/sphereRadius", "", 2.0, 0.5, 4.0};
   Parameter repellingConstant{"/repellingConstant", "", 0.0, 0.0, 0.01};
+
+  // The two spectrum tables for both channels
+  vector<float> spectrumL;
+  vector<float> spectrumR;
+  vector<float> spectrum;
+
+  // STFT variables
+  // Format of frequency samples: COMPLEX, MAG_PHASE, or MAG_FREQ
+  gam::STFT stft = gam::STFT(FFT_SIZE, FFT_SIZE / 4, 0, gam::HANN, gam::MAG_FREQ);
   // --------------------------------------------
 
   // The sample player for 1 sound track only
@@ -128,7 +139,12 @@ struct MyApp : App {
     parameterServer() << sphereRadius;
     gui.add(repellingConstant);
     parameterServer() << repellingConstant;
-    
+
+    // Declare the size of the spectrums
+    spectrumL.resize(FFT_SIZE / 2 + 1);
+    spectrumR.resize(FFT_SIZE / 2 + 1);
+    spectrum.resize(FFT_SIZE / 2 + 1);
+
   }
 
   // onCreate
@@ -204,6 +220,24 @@ struct MyApp : App {
       valueL.set(followLeft(sLeft));
       valueR.set(followRight(sRight));
 
+      // STFT
+      ///*
+      if (stft(io.out(0))) { 
+        // Loop through all the frequency bins
+        for (unsigned k = 0; k < stft.numBins(); ++k) {
+          spectrum[k] = 10.0 * tanh(pow(stft.bin(k).real(), 1.5) );
+        }
+      }
+      /*
+      if (stft(io.out(1))) { 
+        // Loop through all the frequency bins
+        for (unsigned k = 0; k < stft.numBins(); ++k) {
+          spectrumR[k] = 10.0 * tanh(pow(stft.bin(k).real(), 1.5) );
+        }
+      }
+      */
+      //*/
+
       // https://github.com/adamstark/Gist
     }
   }
@@ -230,7 +264,7 @@ struct MyApp : App {
         g.pushMatrix();
         g.translate(-0.5, 0, 0);
         g.scale(sphereSize * valueL.get() * musicPower);
-        
+        //g.lighting(true);
         g.color(RGB(1.0, 1.0 - redColorChange * redColorChange, 1.0 - redColorChange * redColorChange));
         g.draw(pattern0SphereL);
         g.popMatrix();
@@ -238,7 +272,7 @@ struct MyApp : App {
         g.pushMatrix();
         g.translate(0.5, 0, 0);
         g.scale(sphereSize * valueR.get() * musicPower);
-        
+        //g.lighting(true);
         g.color(RGB(1.0 - blueColorChange * blueColorChange, 1.0, 1.0 - blueColorChange * blueColorChange));
         g.draw(pattern0SphereR);
         g.popMatrix();
@@ -286,11 +320,15 @@ struct MyApp : App {
 
       // Important: add the force excerted by audio
       float musicForce = 0.0;
+      int positionInSpectrum = (int) (FFT_SIZE * 0.7 * ((pattern1OriginalPosition[i].y + pattern1CylinderHalfLength) / (2 * pattern1CylinderHalfLength)));
+      /*
       if (pattern1OriginalPosition[i].x < 0) {
-        musicForce = valueL;
+        musicForce = spectrumL[positionInSpectrum];
       } else {
-        musicForce = valueR;
+        musicForce = spectrumR[positionInSpectrum];
       }
+      */
+      musicForce = spectrum[positionInSpectrum];
       pattern1Force[i] += Vec3f(pattern1OriginalPosition[i].x, 0.0, pattern1OriginalPosition[i].z) * musicForce * musicPower;
 
       pattern1Velocity[i] += pattern1Force[i] / pattern1Mass[i] * timeStep;
@@ -317,6 +355,15 @@ struct MyApp : App {
     }
     if (k.key() == '3') {
       pattern = 3;
+    }
+    if (k.key() == 'u') {
+      player.load("../tv.mp3");
+    }
+    if (k.key() == 'i') {
+      player.load("../cd.mp3");
+    }
+    if (k.key() == 'o') {
+      player.load("../lf.mp3");
     }
     return true; 
   }
