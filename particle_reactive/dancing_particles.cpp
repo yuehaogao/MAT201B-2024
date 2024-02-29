@@ -23,10 +23,9 @@ using namespace al;
 
 const float sphereSize = 0.8;
 
-const int pattern1CylinderHeight = 75;
+const int pattern1CylinderHeight = 70;
 const float pattern1CylinderHalfLength = 0.6;
-const int pattern1CylinderNumParticlePerlayer = 50;
-const float pattern1CylinderRadius = 0.25;
+const int pattern1CylinderNumParticlePerlayer = 60;
 const float pattern1AngleIncrement = 2.0 * M_PI / pattern1CylinderNumParticlePerlayer;
 
 const int pattern2BallNumParticle = 1000;
@@ -58,10 +57,12 @@ struct MyApp : App {
   Parameter valueL{"value_left", 0, 0, 1};
   Parameter valueR{"value_right", 0, 0, 1};
   Parameter pattern{"visual_pattern", 0, 0, 3};     // This will be limited to int only
-  Parameter pointSize{"/pointSize", "", 0.3, 0.1, 1.5};
-  Parameter timeStep{"/timeStep", "", 0.5, 0.0, 1.0};
-  Parameter dragFactor{"/dragFactor", "", 0.1, 0.0, 0.9};
-  Parameter springConstant{"/springConstant", "", 0.3, 0.1, 1.0};
+  Parameter musicPower{"/musicPower", "", 2.5, 0.5, 6.0};
+  Parameter pointSize{"/pointSize", "", 0.5, 0.1, 1.5};
+  Parameter timeStep{"/timeStep", "", 1.0, 0.0, 1.5};
+  Parameter dragFactor{"/dragFactor", "", 0.15, 0.0, 0.6};
+  Parameter springConstant{"/springConstant", "", 1.0, 0.1, 5.0};
+  Parameter pattern1CylinderRadius{"/cylinderRadius", "", 0.25, 0.1, 1.0};
   Parameter sphereRadius{"/sphereRadius", "", 2.0, 0.5, 4.0};
   Parameter repellingConstant{"/repellingConstant", "", 0.0, 0.0, 0.01};
   // --------------------------------------------
@@ -84,6 +85,7 @@ struct MyApp : App {
   Mesh pattern1ParticleCylinder;
   vector<Vec3f> pattern1Velocity;
   vector<Vec3f> pattern1Force;
+  vector<Vec3f> pattern1OriginalPosition;   // Archive of original positions of particles
   vector<float> pattern1Mass;
 
   // * Pattern 2:
@@ -110,6 +112,8 @@ struct MyApp : App {
     parameterServer() << valueR;
     gui.add(pattern);
     parameterServer() << pattern;
+    gui.add(musicPower);
+    parameterServer() << musicPower;
     gui.add(pointSize);
     parameterServer() << pointSize;
     gui.add(timeStep);
@@ -118,6 +122,8 @@ struct MyApp : App {
     parameterServer() << dragFactor;
     gui.add(springConstant); 
     parameterServer() << springConstant;
+    gui.add(pattern1CylinderRadius);
+    parameterServer() << pattern1CylinderRadius;
     gui.add(sphereRadius);
     parameterServer() << sphereRadius;
     gui.add(repellingConstant);
@@ -153,6 +159,7 @@ struct MyApp : App {
         float x = pattern1CylinderRadius * cos(angle);
         float z = pattern1CylinderRadius * sin(angle);
         pattern1ParticleCylinder.vertex(Vec3f(x, y, z));
+        pattern1OriginalPosition.push_back(Vec3f(x, y, z));  // Archive of original positions of particles
 
         float hue = 0.7 / pattern1CylinderHeight * layerIndex;
         pattern1ParticleCylinder.color(HSV(hue, 1.0f, 1.0f));
@@ -164,6 +171,8 @@ struct MyApp : App {
       
       }
     }
+    //const vector<Vec3f> &pattern1OriginalPositionVec(pattern1ParticleCylinder.vertices());
+
     // Pattern 2: ...
     // Pattern 3: ...
     
@@ -205,7 +214,7 @@ struct MyApp : App {
   //
   void onDraw(Graphics& g) override {
     // The background changes brightness according to the volume
-    g.clear(0.6 * (valueL.get() + valueR.get()) * (valueL.get() + valueR.get()) * 5.0);
+    g.clear(0.6 * (valueL.get() + valueR.get()) * (valueL.get() + valueR.get()) * 2.0 * musicPower);
     float redColorChange = 5.0 * valueL.get();
     if (redColorChange > 2.0) {
       redColorChange = 2.0;
@@ -220,7 +229,7 @@ struct MyApp : App {
       case 0:
         g.pushMatrix();
         g.translate(-0.5, 0, 0);
-        g.scale(sphereSize * valueL.get() * 3.0);
+        g.scale(sphereSize * valueL.get() * musicPower);
         
         g.color(RGB(1.0, 1.0 - redColorChange * redColorChange, 1.0 - redColorChange * redColorChange));
         g.draw(pattern0SphereL);
@@ -228,7 +237,7 @@ struct MyApp : App {
 
         g.pushMatrix();
         g.translate(0.5, 0, 0);
-        g.scale(sphereSize * valueR.get() * 3.0);
+        g.scale(sphereSize * valueR.get() * musicPower);
         
         g.color(RGB(1.0 - blueColorChange * blueColorChange, 1.0, 1.0 - blueColorChange * blueColorChange));
         g.draw(pattern0SphereR);
@@ -263,13 +272,33 @@ struct MyApp : App {
     // Deal with all the particle forces
     vector<Vec3f> &pattern1PositionVec(pattern1ParticleCylinder.vertices());
     for (int i = 0; i < pattern1PositionVec.size(); i++) {
-      // spring force
+      // Add spring force to particles' original positions
+      Vec3f centerAtItsLayer = {0.0, pattern1PositionVec[i].y, 0.0};
+      Vec3f particleToCenter = centerAtItsLayer - pattern1PositionVec[i];
+      float distanceToSurface = particleToCenter.mag() - pattern1CylinderRadius;
+      Vec3f springForce = particleToCenter.normalize() * springConstant * distanceToSurface;
+      pattern1Force[i] += springForce;
     }
+    
+    // Exert the force and accelerations
     for (int i = 0; i < pattern1Velocity.size(); i++) {
       pattern1Force[i] += - pattern1Velocity[i] * dragFactor;
+
+      // Important: add the force excerted by audio
+      float musicForce = 0.0;
+      if (pattern1OriginalPosition[i].x < 0) {
+        musicForce = valueL;
+      } else {
+        musicForce = valueR;
+      }
+      pattern1Force[i] += Vec3f(pattern1OriginalPosition[i].x, 0.0, pattern1OriginalPosition[i].z) * musicForce * musicPower;
+
       pattern1Velocity[i] += pattern1Force[i] / pattern1Mass[i] * timeStep;
       pattern1PositionVec[i] += pattern1Velocity[i] * timeStep;
     }
+
+
+    // Clear all accelerations
     for (auto &a : pattern1Force) a.set(0);
     
 
@@ -277,13 +306,17 @@ struct MyApp : App {
 
   void onMessage(osc::Message& m) override { m.print(); }
   bool onKeyDown(const Keyboard& k) override { 
+    if (k.key() == '0') {
+      pattern = 0;
+    }
     if (k.key() == '1') {
-      // introduce some "random" forces
-      for (int i = 0; i < pattern1Velocity.size(); i++) {
-        // F = ma
-        pattern1Force[i] += randomVec3f(1);
-      }
-
+      pattern = 1;
+    }
+    if (k.key() == '2') {
+      pattern = 2;
+    }
+    if (k.key() == '3') {
+      pattern = 3;
     }
     return true; 
   }
