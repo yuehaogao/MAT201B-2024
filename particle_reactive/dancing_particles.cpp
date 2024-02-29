@@ -324,7 +324,7 @@ struct MyApp : App {
       // Important: add the force excerted by audio
       float musicForce = 0.0;
       
-      int positionInSpectrum = std::floor(i / 50);
+      int positionInSpectrum = std::floor(pow(i, 1.7) / 5000);
       //int positionInSpectrum = std::floor(((pattern1PositionVec[i].y + 0.6) / 1.2) * 2025);
       //int positionInSpectrum = (int) (FFT_SIZE * 0.5 * ((pattern1PositionVec[i].y + pattern1CylinderHalfLength) / (2 * pattern1CylinderHalfLength))) - 0.5 * FFT_SIZE;
       /*
@@ -335,7 +335,7 @@ struct MyApp : App {
       }
       */
       musicForce = spectrum[positionInSpectrum];
-      pattern1Force[i] += Vec3f(pattern1OriginalPosition[i].x, 0.0, pattern1OriginalPosition[i].z) * musicForce * musicPower;
+      pattern1Force[i] += Vec3f(pattern1OriginalPosition[i].x, 0.0, pattern1OriginalPosition[i].z) * musicForce * musicPower * ((200.0 + 3.0 * i) / 2000.0);
 
       pattern1Velocity[i] += pattern1Force[i] / pattern1Mass[i] * timeStep;
       pattern1PositionVec[i] += pattern1Velocity[i] * timeStep;
