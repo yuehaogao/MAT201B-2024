@@ -16,7 +16,7 @@
 #include "Gamma/Analysis.h"
 #include "Gamma/DFT.h"
 #include "Gamma/Effects.h"
-#include "Gamma/SamplePlayer.h"
+#include "Gamma/SamplePlayer.h"++
 #include <cmath>
 #include <fstream>
 #include <vector>
@@ -33,6 +33,7 @@ const float timeStep = 1.0;
 
 const int pattern1CylinderHeight = 56;
 const int pattern1CylinderNumParticlePerlayer = 80;
+const int pattern1NumParticle = pattern1CylinderHeight * pattern1CylinderNumParticlePerlayer;
 const float pattern1AngleIncrement = 2.0 * M_PI / pattern1CylinderNumParticlePerlayer;
 const float pattern1CylinderHalfLength = 0.5;
 vector<Vec3f> pattern1OriginalPosition;
@@ -47,7 +48,7 @@ const float pattern2LayerRadiusIncrement = 1.0 / 3.0;
 // Common-used statements or parameters
 struct CommonState {
   // Public parameters for all patterns
-  int pattern;
+  int pattern = 1;
   float valueL;
   float valueR;
   float musicPower;
@@ -57,9 +58,9 @@ struct CommonState {
 
   // Pattern 1 specific parameters
   float pattern1CylinderRadius;
-  Vec3f pattern1Velocity[5000];
-  Vec3f pattern1Force[5000];
-  //Vec3f pattern1OriginalPosition[5000];   // Archive of original positions of particles
+  Vec3f pattern1RealTimePosition[5000];
+  HSV pattern1Colors[5000];
+  float hue;
   
   
   // Pattern 2 specific parameters
@@ -116,6 +117,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
   // * Pattern 1: a cylinder of particles dancing according to the spectrum (enveloped)
   Mesh pattern1ParticleCylinder;
+  Vec3f pattern1Velocity[pattern1NumParticle];
+  Vec3f pattern1Force[pattern1NumParticle];
 
   // * Pattern 2:
   // Mesh pattern2ParticleBall;
@@ -202,18 +205,19 @@ struct MyApp : DistributedAppWithState<CommonState> {
           float z = pattern1CylinderRadius * sin(angle);
 
           // Place the particle's position
-          pattern1ParticleCylinder.vertex(Vec3f(x, y, z));
-          //state().pattern1OriginalPosition[i] = Vec3f(x, y, z);  // Archive of original positions of particles
-          pattern1OriginalPosition.push_back(Vec3f(x, y, z));
+          pattern1ParticleCylinder.vertex(Vec3f(x, y, z));        // Push the position into the mesh
+          pattern1OriginalPosition.push_back(Vec3f(x, y, z));     // Local archive
+          state().pattern1RealTimePosition[i] = Vec3f(x, y, z);   // Common real-time position
 
           // Color the particle
-          float hue = 0.7 / pattern1CylinderHeight * layerIndex;
-          pattern1ParticleCylinder.color(HSV(hue, 1.0f, 1.0f));
+          state().hue = 0.7 / pattern1CylinderHeight * layerIndex;
+          pattern1ParticleCylinder.color(HSV(state().hue, 1.0f, 1.0f));
+          state().pattern1Colors[i] = HSV(state().hue, 1.0f, 1.0f);       // Like this?
 
           // Set the particle's physical force system
           pattern1ParticleCylinder.texCoord(pow(particleMass, 1.0f / 3), 0);
-          state().pattern1Velocity[i] = Vec3f(0.0, 0.0, 0.0);
-          state().pattern1Force[i] = Vec3f(0.0, 0.0, 0.0);
+          pattern1Velocity[i] = Vec3f(0.0, 0.0, 0.0);
+          pattern1Force[i] = Vec3f(0.0, 0.0, 0.0);
         }
       }
     
@@ -227,7 +231,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       followRight.lag(0.5);
   
       // Initialize the position of "camera"
-      nav().pos(0, 0, 5.0);
+      nav().pos(0, 0, 0.0);
     }
   }
 
@@ -318,12 +322,12 @@ struct MyApp : DistributedAppWithState<CommonState> {
   // For pattern 2, 3: calculate the new force excerted on each particle
   //
   void onAnimate(double dt) override {
-    if (isPrimary()) {
+     if (isPrimary()) {
+    
       // Set the parameter of "pattern" to its floored-down int value
+      // Unify local data with "state" data (only pattern)
       int flooredPatternIndex = (int) (std::floor(pattern));
       pattern = flooredPatternIndex;
-
-      // Unify local data with "state" data (only pattern)
       state().pattern = pattern;
       
       // Pattern 1:
@@ -335,36 +339,35 @@ struct MyApp : DistributedAppWithState<CommonState> {
         Vec3f particleToCenter = centerAtItsLayer - pattern1PositionVec[i];
         float distanceToSurface = particleToCenter.mag() - pattern1CylinderRadius;
         Vec3f springForce = particleToCenter.normalize() * springConstant * distanceToSurface;
-        state().pattern1Force[i] += springForce;
+        pattern1Force[i] += springForce;
       
-    
-        // Exert the force and accelerations
-      
-        state().pattern1Force[i] -= state().pattern1Velocity[i] * dragFactor;
 
         // Important: add the force excerted by audio
-        float musicForce = 0.0;
-      
         int positionInSpectrum = std::floor(pow(i, 1.8) / 10000);
         //int positionInSpectrum = std::floor(((pattern1PositionVec[i].y + 0.6) / 1.2) * 2025);
         //int positionInSpectrum = (int) (FFT_SIZE * 0.5 * ((pattern1PositionVec[i].y + pattern1CylinderHalfLength) / (2 * pattern1CylinderHalfLength))) - 0.5 * FFT_SIZE;
 
-        musicForce = state().spectrum[positionInSpectrum];
+        float musicForce = state().spectrum[positionInSpectrum];
         float indexForceBoostLimit = 3.0;
         float fftForce = ((pow(i, 1.5)) / 100000.0) * musicForce;
         if (fftForce > indexForceBoostLimit ) {
           fftForce = indexForceBoostLimit;
         }
-        state().pattern1Force[i] -= Vec3f(pattern1OriginalPosition[i].x, 0.0, pattern1OriginalPosition[i].z) * fftForce * state().musicPower;
+        pattern1Force[i] -= Vec3f(pattern1OriginalPosition[i].x, 0.0, pattern1OriginalPosition[i].z) * fftForce * state().musicPower;
+        
+        pattern1Velocity[i] += pattern1Force[i] / particleMass * timeStep;
+        pattern1Force[i] -= pattern1Velocity[i] * dragFactor;            // Dimish the force due to acceleration
 
-        state().pattern1Velocity[i] += state().pattern1Force[i] / particleMass * timeStep;
-        pattern1PositionVec[i] += state().pattern1Velocity[i] * timeStep;
+        // Exert the force and accelerations
+        pattern1PositionVec[i] += pattern1Velocity[i] * timeStep;        // Move the particle locally
+        
+
       }
 
       pointSize = musicPower * 0.5 * (valueL + valueR);
 
       // Clear all accelerations
-      for (auto &a : state().pattern1Force) a.set(0);
+      for (auto &a : pattern1Force) a.set(0);
 
       // Unify other parameters between local and "state"
       state().valueL = valueL;
@@ -374,6 +377,20 @@ struct MyApp : DistributedAppWithState<CommonState> {
       state().springConstant = springConstant;
       state().pattern1CylinderRadius = pattern1CylinderRadius;
 
+
+   
+      for (int i = 0; i < pattern1NumParticle; i++) {
+        state().pattern1RealTimePosition[i] = pattern1PositionVec[i];    // Tell the distributed app about it
+      }
+    } else {
+      // Unify the position and hue of distributed app
+      // Clear the mesh from previous frame
+      pattern1ParticleCylinder.vertices().clear();
+      for (int i = 0; i < pattern1NumParticle; i++) {
+        // Update each particle's position
+        pattern1ParticleCylinder.vertex(state().pattern1RealTimePosition[i]);
+        
+      }
     }
 
   }
