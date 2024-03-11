@@ -1,9 +1,14 @@
 
-Dancing Particles - Yuehao Gao, University of California, Santa Barbara
+Dancing Particles - Yuehao Gao (高悦淏)
 
-MAT201B, Professor Karl Yerkes
+University of California, Santa Barbara
 
-This is the repository of my project implementing a 3D visualizer of input music files. The project brings [2-4] distinct visual patterns that follows along the input signal. The input file will be played in loops, and limited to ".mp3" or ".wav" only. The major file dealing with all the stuff 
+MAT201B (2024), Professor Karl Yerkes
+
+This is the repository of my project implementing a 3D visualizer of input music files. The project brings [2-4] distinct visual patterns that moves along the input audio signal. 
+
+The major file dealing with all the algorithms is the "dancing_particles.cpp".
+The input file will be played in loops, and limited to ".mp3" or ".wav" only. The major file dealing with all the stuff 
 input signal are processed by the "player()" object in the
 
 For my final project of this course, I aim to accomplish a 3D audio visualizer. Based on the
