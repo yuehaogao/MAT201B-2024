@@ -1,4 +1,4 @@
-// 03-07-2024
+// 03-10-2024
 
 // Yuehao Gao | MAT201B
 // 2022-02-23 | Final Project
@@ -34,7 +34,7 @@ const float timeStep = 1.0;
 const int pattern1CylinderHeight = 56;
 const int pattern1CylinderNumParticlePerlayer = 80;
 const float pattern1AngleIncrement = 2.0 * M_PI / pattern1CylinderNumParticlePerlayer;
-const float pattern1CylinderHalfLength = 0.6;
+const float pattern1CylinderHalfLength = 0.5;
 vector<Vec3f> pattern1OriginalPosition;
 
 /*
@@ -89,8 +89,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
   Parameter pattern{"visual_pattern", 1, 0, 3};     // This will be limited to int only
   Parameter musicPower{"/musicPower", "", 3.0, 0.1, 8.0};
   Parameter pointSize{"/pointSize", "", 0.5, 0.1, 1.5};
-  Parameter springConstant{"/springConstant", "", 1.0, 0.1, 5.0};
-  Parameter pattern1CylinderRadius{"/cylinderRadius", "", 0.25, 0.1, 1.0};
+  Parameter springConstant{"/springConstant", "", 0.3, 0.05, 2.0};
+  Parameter pattern1CylinderRadius{"/cylinderRadius", "", 0.75, 0.2, 2.0};
   // Parameter sphereRadius{"/sphereRadius", "", 2.0, 0.5, 4.0};
   // Parameter repellingConstant{"/repellingConstant", "", 0.0, 0.0, 0.01};
 
@@ -227,7 +227,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       followRight.lag(0.5);
   
       // Initialize the position of "camera"
-      nav().pos(0, 0, 2.5);
+      nav().pos(0, 0, 5.0);
     }
   }
 
@@ -282,16 +282,16 @@ struct MyApp : DistributedAppWithState<CommonState> {
     switch((int)(state().pattern)) {
       case 0:
         g.pushMatrix();
-        g.translate(-0.5, 0, 0);
-        g.scale(sphereSize * state().valueL * state().musicPower);
+        g.translate(-1.0, 0, 0);
+        g.scale(sphereSize * state().valueL * state().musicPower * 1.5);
         //g.lighting(true);
         g.color(RGB(1.0, 1.0 - pow(redColorChange, 2.0), 1.0 - pow(redColorChange, 2.0)));
         g.draw(pattern0SphereL);
         g.popMatrix();
 
         g.pushMatrix();
-        g.translate(0.5, 0, 0);
-        g.scale(sphereSize * state().valueR * state().musicPower);
+        g.translate(1.0, 0, 0);
+        g.scale(sphereSize * state().valueR * state().musicPower * 1.5);
         //g.lighting(true);
         g.color(RGB(1.0 - pow(greenColorChange, 2.0), 1.0, 1.0 - pow(greenColorChange, 2.0)));
         g.draw(pattern0SphereR);
@@ -333,8 +333,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
         // Add spring force to particles' original positions
         Vec3f centerAtItsLayer = {0.0, pattern1PositionVec[i].y, 0.0};
         Vec3f particleToCenter = centerAtItsLayer - pattern1PositionVec[i];
-        float distanceToSurface = particleToCenter.mag() - state().pattern1CylinderRadius;
-        Vec3f springForce = particleToCenter.normalize() * state().springConstant * distanceToSurface;
+        float distanceToSurface = particleToCenter.mag() - pattern1CylinderRadius;
+        Vec3f springForce = particleToCenter.normalize() * springConstant * distanceToSurface;
         state().pattern1Force[i] += springForce;
       
     
@@ -350,17 +350,18 @@ struct MyApp : DistributedAppWithState<CommonState> {
         //int positionInSpectrum = (int) (FFT_SIZE * 0.5 * ((pattern1PositionVec[i].y + pattern1CylinderHalfLength) / (2 * pattern1CylinderHalfLength))) - 0.5 * FFT_SIZE;
 
         musicForce = state().spectrum[positionInSpectrum];
-        float indexForceBoostLimit = 0.333;
-        float indexForceBoost = ((pow(i, 1.25)) / 1000.0);
-        if (indexForceBoost > indexForceBoostLimit * musicPower * i) {
-          indexForceBoost = indexForceBoostLimit * musicPower * i;
+        float indexForceBoostLimit = 3.0;
+        float fftForce = ((pow(i, 1.5)) / 100000.0) * musicForce;
+        if (fftForce > indexForceBoostLimit ) {
+          fftForce = indexForceBoostLimit;
         }
-        state().pattern1Force[i] += Vec3f(pattern1OriginalPosition[i].x, 0.0, pattern1OriginalPosition[i].z)
-         * musicForce * state().musicPower * indexForceBoost;
+        state().pattern1Force[i] -= Vec3f(pattern1OriginalPosition[i].x, 0.0, pattern1OriginalPosition[i].z) * fftForce * state().musicPower;
 
         state().pattern1Velocity[i] += state().pattern1Force[i] / particleMass * timeStep;
         pattern1PositionVec[i] += state().pattern1Velocity[i] * timeStep;
       }
+
+      pointSize = musicPower * 0.5 * (valueL + valueR);
 
       // Clear all accelerations
       for (auto &a : state().pattern1Force) a.set(0);
