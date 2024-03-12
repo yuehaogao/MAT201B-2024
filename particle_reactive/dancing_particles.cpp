@@ -1,5 +1,5 @@
 // Yuehao Gao | MAT201B
-// 2022-03-11 | Final Project
+// 2022-03-12 | Final Project
 // Audio-reactive 3D visualizer
 
 // GitHub: https://github.com/yuehaogao/MAT201B-2024_Yuehao_Gao
@@ -103,6 +103,8 @@ const float pattern1AngleIncrement = 2.0 * M_PI / pattern1CylinderNumParticlePer
 const float pattern1CylinderHalfLength = 0.5;
 vector<Vec3f> pattern1OriginalPosition;
 
+
+int frameCount = 0;
 
 
 // -----------------------------------------------------------------------------
@@ -405,6 +407,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
   //
   void onAnimate(double dt) override { 
 
+    frameCount++;
+
     if (isPrimary()) {
       // Update the camera position
       state().pose = nav();
@@ -435,7 +439,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       
 
         // Important: add the force excerted by audio
-        int positionInSpectrum = std::floor(pow(i, 1.8) / 10000);
+        int positionInSpectrum = 2 + std::floor(pow(i, 2.15) / 36000);
         //int positionInSpectrum = std::floor(((pattern1PositionVec[i].y + 0.6) / 1.2) * 2025);
         //int positionInSpectrum = (int) (FFT_SIZE * 0.5 * ((pattern1PositionVec[i].y + pattern1CylinderHalfLength) / (2 * pattern1CylinderHalfLength))) - 0.5 * FFT_SIZE;
 
@@ -451,14 +455,19 @@ struct MyApp : DistributedAppWithState<CommonState> {
         // Exert the force and accelerations
         pattern1PositionVec[i] += pattern1Velocity[i] * timeStep;        // Move the particle locally
         
-        
+        // POSITION IN SPECTRUM: GOOD
 
-        // if (isnan(musicForce)) {
-        //     cout << "NAN MUSIC FORCE is at particle indexed: " << i << endl;
-        //   }
-         // if (isnan(positionInSpectrum)) {
-            //cout << "NAN POS IN SPEC is at particle indexed: " << i << endl;
-         // }
+        //  if (isnan(musicForce)) {
+        //      cout << "NAN MUSIC FORCE is at particle indexed: " << i << endl;
+        //    }
+        //  if (isnan(state().spectrum[0])) {
+        //     cout << "NAN POS IN SPEC is at particle indexed: " << i << endl;
+        //  }
+        if (frameCount == 1) {
+          //if (i < 300) {
+            cout << i << ": " << positionInSpectrum << endl;
+          //}
+        }
         
           // if (isnan(pattern1PositionVec[i].x)) {
           //   cout << "NAN X is at particle indexed: " << i << endl;
