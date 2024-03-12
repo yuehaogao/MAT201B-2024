@@ -2,31 +2,33 @@
 // 2022-03-11 | Final Project
 // Audio-reactive 3D visualizer
 
+// GitHub: https://github.com/yuehaogao/MAT201B-2024_Yuehao_Gao
+// Full Introduction: https://github.com/yuehaogao/MAT201B-2024_Yuehao_Gao/blob/main/README.md
+
 
 // Introduction
 /*
   This is my project implementing a 3D visualizer for input music files. 
-  The project brings 2 (future: 4) distinct visual patterns that moves along the input audio signal. 
-  There is a controllable sliding parameter named "pattern" that allows changing the visual parameter from one to another. 
+  The project brings 2 (future: 4) distinct visual patterns that moves along the input audio signal.
   
   --- Express Keys ---
   [0], [1], [2]: changing visual patterns
   [u], [i], [o]: switch between music files
 
   --- Controllable Parameters ---
-  VisualPattern (range 0-3, acquiscent: 1): 
+  VisualPattern (range 0 - 3, acquiscent: 1): 
     controlls the current visual pattern shown to follow the music. 
     This parameter will automatically be floored to the lower integer by the "onAnimate" fuction.
 
-  MusicPower (range 0-8, acquiscent: 3): 
+  MusicPower (range 0 - 8, acquiscent: 3): 
     how strong the music affects the visual patterns,
     you may understand this parameter as "music volume".
 
-  SpringConstant (range 0.05-2, acquiscent: 0.3): 
+  SpringConstant (range 0.05 - 2, acquiscent: 0.3): 
     how stiff the spring is, 
-    used for pattern {1, 2, 3} for calculating according to the Hook's Law.
+    used for pattern {1, 2, 3} for calculating according to the Hooke's Law.
 
-  Pattern1CylinderRadius (range 0.2-2, acquiscent: 0.75): 
+  Pattern1CylinderRadius (range 0.2 - 2, acquiscent: 0.75): 
     the radius of the cylinder, 
     used for pattern {1}.
 
@@ -43,18 +45,29 @@
     Each of the two spheres are seperately drawn with a distinct "Mesh" object in the Distributed App structure,
     respectively named "pattern0SphereL" and "pattern0SphereR".
 
- Pattern 1 (Express key [1]): 
-   a SINGULAR hollow cylinder made by particles that dances according spectrum of the FFT of the input audio. 
-   Specifically, from the bottom part to the top part of the particle cylinder, 
-   the particles are gradually colored from red to blue (fixed color), 
-   and dances according to the dB value from the lower frequencies to the higher frequencies on the STFT table. 
-   The position that each particle from the bottom to the top that locate themselves on the spectrum is non-linear, 
-   nor does the value of "musicForce" as higher frequencies have lower powers. 
-   How ardently the particles dance could also be controlled by the "musicPower" parameter. 
-   The sizes of the particles are also determined by the enveloped signal value of the music (average of left and right channel", 
-   just like how the background works. 
-   The cylinder is drawn by a SINGULAR Mesh called "pattern1ParticleCylinder".
+  Pattern 1 (Express key [1]): 
+    a SINGULAR hollow cylinder made by particles that dances according spectrum of the FFT of the input audio. 
+    Specifically, from the bottom part to the top part of the particle cylinder, 
+    the particles are gradually colored from red to blue (fixed color), 
+    and dances according to the dB value from the lower frequencies to the higher frequencies on the STFT table. 
+    The position that each particle from the bottom to the top that locate themselves on the spectrum is non-linear, 
+    nor does the value of "musicForce" as higher frequencies have lower powers. 
+    How ardently the particles dance could also be controlled by the "musicPower" parameter. 
+    The sizes of the particles are also determined by the enveloped signal value of the music (average of left and right channel", 
+    just like how the background works. 
+    The cylinder is drawn by a SINGULAR Mesh called "pattern1ParticleCylinder".
 */
+
+
+
+
+// ---- TO DO -----
+// make the distributed app working by showing the meshes
+// fixed the minor bug for pattern 1: the particles should not float horizontally
+// implement pattern 2
+// implement pattern 3
+// make the music selection system by "dropdown list" instead of triple express keys
+
 
 
 // All files, libraries, functions imported:
@@ -110,7 +123,6 @@ struct CommonState {
   float pattern1CylinderRadius;
   Vec3f pattern1RealTimePosition[5000];
   HSV pattern1Colors[5000];
-  float hue;
   
   
   // Pattern 2 specific parameters
@@ -251,9 +263,9 @@ struct MyApp : DistributedAppWithState<CommonState> {
           state().pattern1RealTimePosition[i] = Vec3f(x, y, z);   // Common real-time position
 
           // Color the particle
-          state().hue = 0.7 / pattern1CylinderHeight * layerIndex;
-          pattern1ParticleCylinder.color(HSV(state().hue, 1.0f, 1.0f));
-          state().pattern1Colors[i] = HSV(state().hue, 1.0f, 1.0f);       // Like this?
+          float hue = 0.7 / pattern1CylinderHeight * layerIndex;
+          pattern1ParticleCylinder.color(HSV(hue, 1.0f, 1.0f));
+          state().pattern1Colors[i] = HSV(hue, 1.0f, 1.0f);       
 
           // Set the particle's physical force system
           pattern1ParticleCylinder.texCoord(pow(particleMass, 1.0f / 3), 0);
