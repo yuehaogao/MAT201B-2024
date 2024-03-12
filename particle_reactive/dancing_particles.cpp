@@ -62,8 +62,8 @@
 
 
 // ---- TO DO -----
-// make the distributed app working by showing the meshes
 // fixed the minor bug for pattern 1: the particles should not float horizontally
+// 
 // implement pattern 2
 // implement pattern 3
 // make the music selection system by "dropdown list" instead of triple express keys
@@ -127,7 +127,7 @@ struct CommonState {
   
   // Pattern 2 specific parameters
   // Pattern 3 specific parameters
-
+  Pose pose;
 };
 
 // To generate a random 3D vector for position, color, ...
@@ -232,19 +232,22 @@ struct MyApp : DistributedAppWithState<CommonState> {
   // Initialize the position of camera
   //
   void onCreate() override { 
-    if (isPrimary()) {
-      pointShader.compile(slurp("../point-vertex.glsl"),
+    bool worked = pointShader.compile(slurp("../point-vertex.glsl"),
                           slurp("../point-fragment.glsl"),
                           slurp("../point-geometry.glsl"));
+
+      if (!worked) {
+        exit(1);
+      }
+
 
       // ----------- Initialize Parameters for All Meshes Begins -------------
 
       // Pattern 0: move the two spheres seperately to the left and right
-      addSphere(pattern0SphereL);
-      addSphere(pattern0SphereR);
+
 
       // Pattern 1: create all the particles with their initial positions, colors, velocity, and forces
-      pattern1ParticleCylinder.primitive(Mesh::POINTS);
+      
 
       // Here, "i" means the index of the article, from 0 to the last one
       int i = 0;
@@ -271,8 +274,12 @@ struct MyApp : DistributedAppWithState<CommonState> {
           pattern1ParticleCylinder.texCoord(pow(particleMass, 1.0f / 3), 0);
           pattern1Velocity[i] = Vec3f(0.0, 0.0, 0.0);
           pattern1Force[i] = Vec3f(0.0, 0.0, 0.0);
+          i++;
         }
       }
+
+    if (isPrimary()) {
+      
     
       // Pattern 2: ...
       // Pattern 3: ...
@@ -286,6 +293,11 @@ struct MyApp : DistributedAppWithState<CommonState> {
       // Initialize the position of "camera"
       nav().pos(0, 0, 0.0);
     }
+
+  // do this in both primary and secondary
+    addSphere(pattern0SphereL);
+    addSphere(pattern0SphereR);
+    pattern1ParticleCylinder.primitive(Mesh::POINTS);
   }
 
   // onSound
@@ -335,6 +347,13 @@ struct MyApp : DistributedAppWithState<CommonState> {
       greenColorChange = 2.0;
     } 
 
+    Mesh m;
+    addSphere(m, 0.1);
+    g.color(1, 0, 0);
+    g.draw(m);
+
+
+
     
     // Show different pattern according to the "pattern" value
     switch((int)(state().pattern)) {
@@ -358,6 +377,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       case 1:
         g.shader(pointShader);
         g.shader().uniform("pointSize", state().pointSize / 100);
+        //cout << state().pointSize << endl;
         g.blending(true);
         g.blendTrans();
         g.depthTesting(true);
@@ -376,8 +396,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
   // For pattern 2, 3: calculate the new force excerted on each particle
   //
   void onAnimate(double dt) override {
-     if (isPrimary()) {
-    
+    if (isPrimary()) {
+      state().pose = nav();
       // Set the parameter of "pattern" to its floored-down int value
       // Unify local data with "state" data (only pattern)
       int flooredPatternIndex = (int) (std::floor(pattern));
@@ -441,15 +461,30 @@ struct MyApp : DistributedAppWithState<CommonState> {
       for (int i = 0; i < pattern1NumParticle; i++) {
         state().pattern1RealTimePosition[i] = pattern1PositionVec[i];    // Tell the distributed app about it
       }
+      //pattern1PositionVec[0].print();
+       //cout << endl;
     } else {
+      nav().set(state().pose);
+      //nav().print();
+
       // Unify the position and hue of distributed app
       // Clear the mesh from previous frame
       pattern1ParticleCylinder.vertices().clear();
+      pattern1ParticleCylinder.colors().clear();
+      int nan = 0;
       for (int i = 0; i < pattern1NumParticle; i++) {
         // Update each particle's position
         pattern1ParticleCylinder.vertex(state().pattern1RealTimePosition[i]);
+        pattern1ParticleCylinder.color(state().pattern1FixedColors[i]);
+
+        if (isnan(state().pattern1RealTimePosition[i].x)) {
+          nan++;
+        }
         
       }
+      //cout << nan << endl;
+      //state().pattern1RealTimePosition[0].print();
+      //cout << endl;
     }
 
   }
