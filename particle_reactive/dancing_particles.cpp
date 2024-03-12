@@ -13,7 +13,7 @@
   
   --- Express Keys ---
   [0], [1], [2]: changing visual patterns
-  [u], [i], [o]: switch between music files
+  [u], [i], [o], [k], [l]: switch between music files
 
   --- Controllable Parameters ---
   VisualPattern (range 0 - 3, acquiscent: 1): 
