@@ -9,7 +9,7 @@ The current version allows switching between the 3 input pieces with the [u], [i
 
 The major c++ file dealing with all the algorithms is the "dancing_particles.cpp", and it takes in the one of the audio files (limited to be located in the same folder) at a time using the "player()" object in the Distributed App structure. The input file will be played in loops, and limited to ".mp3" or ".wav" only. Specifically, the input audio is acquiescently to be in stereo, meaning having two channels. In the function named "onSound", two sound samples are grabbed each time, and sent to the left and right channels separately. If not, then each sample will be sent to both the left and right channels at the same time.
 
----------- Introduction of Background and Visual Patterns ----------
+------------------------------ Introduction of Background and Visual Patterns ------------------------------
 
 - Background: the background is acquiscently all-black, and turns white according to the enveloped music volume, which mimics a flashing-lighting environment of dancing halls or party venues.
 
@@ -24,7 +24,7 @@ The major c++ file dealing with all the algorithms is the "dancing_particles.cpp
 - Pattern 3 (Express key [3]): two spheres of particles that dances according to the FFT of the left and right channel signal *(hypothesized, to be continued...)*
 
 
----------- Introduction of Controllable Parameters ----------
+------------------------------ Introduction of Controllable Parameters ------------------------------
 - VisualPattern (range 0-3, acquiscent: 1): controlls the current visual pattern shown to follow the music. This parameter will automatically be floored to the lower integer by the "onAnimate" fuction.
 
 - MusicPower (range 0-8, acquiscent: 3): how strong the music affects the visual patterns, you may understand this parameter as "music volume".
