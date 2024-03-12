@@ -111,18 +111,18 @@ vector<Vec3f> pattern1OriginalPosition;
 // Information shared with the "Distributed App"
 struct CommonState {
   // Public parameters for all patterns
-  int pattern;
-  float valueL;
-  float valueR;
-  float musicPower;
-  float pointSize;
-  float springConstant;
-  float spectrum[FFT_SIZE / 2 + 500];
+  int pattern;                             // The visual pattern, either being 0, 1, 2, or 3
+  float valueL;                            // Envelopsed right channel value
+  float valueR;                            // Enveloped left channel value
+  float musicPower;                        // The "volume" of music: how much the music affect visual patterns
+  float pointSize;                         // The size of the particles
+  float springConstant;                    // The spring constant for Hooke's Law
+  float spectrum[FFT_SIZE / 2 + 500];      // The added number is arbitrarily decided
 
   // Pattern 1 specific parameters
-  float pattern1CylinderRadius;
-  Vec3f pattern1RealTimePosition[5000];
-  HSV pattern1FixedColors[5000];
+  float pattern1CylinderRadius;            // The radius of the cylinder
+  Vec3f pattern1RealTimePosition[5000];    // The updated (at this moment) position of each particle on the cylinder
+  HSV pattern1FixedColors[5000];           // The fixed color (HSV) of each particle on the cylinder
   
   
   // Pattern 2 specific parameters
