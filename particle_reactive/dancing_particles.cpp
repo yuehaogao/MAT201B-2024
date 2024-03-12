@@ -61,7 +61,6 @@
 
 
 // ---- TO DO -----
-// fix the minor bug for pattern 1: the particles should not float horizontally
 // implement pattern 2
 // implement pattern 3
 // make the music selection system by "dropdown list" instead of triple express keys
