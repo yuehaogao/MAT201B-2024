@@ -5,7 +5,7 @@
 
 This is the repository of my project implementing a 3D visualizer for input music files. The project brings 2 (future: 4) distinct visual patterns that moves along the input audio signal. There is a controllable sliding parameter named "pattern" that allows changing the visual parameter from one to another. You may also use express keys (number keys: [0], [1] (future: [2], [3])) to change visual patterns.
 
-The current version allows switching between the 3 input pieces with the [u], [i], [o] express key. In the future, it will allow a dropdown list to choose between multiple input music files.
+The current version allows switching between the 3 input pieces with the [u], [i], [o], [k], [l] express key. In the future, it will allow a dropdown list to choose between multiple input music files.
 
 The major c++ file dealing with all the algorithms is the "dancing_particles.cpp", and it takes in the one of the audio files (limited to be located in the same folder) at a time using the "player()" object in the Distributed App structure. The input file will be played in loops, and limited to ".mp3" or ".wav" only. Specifically, the input audio is acquiescently to be in stereo, meaning having two channels. In the function named "onSound", two sound samples are grabbed each time, and sent to the left and right channels separately. If not, then each sample will be sent to both the left and right channels at the same time.
 
