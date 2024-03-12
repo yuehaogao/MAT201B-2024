@@ -1,7 +1,7 @@
 
-Dancing Particles - Yuehao Gao, University of California, Santa Barbara
+## Dancing Particles - Yuehao Gao, University of California, Santa Barbara
 
-MAT201B, Professor Karl Yerkes, March 2024
+## MAT201B, Professor Karl Yerkes, March 2024
 
 This is the repository of my project implementing a 3D visualizer for input music files. The project brings 2 (future: 4) distinct visual patterns that moves along the input audio signal. There is a controllable sliding parameter named "pattern" that allows changing the visual parameter from one to another. You may also use express keys (number keys: [0], [1] (future: [2], [3])) to change visual patterns.
 
