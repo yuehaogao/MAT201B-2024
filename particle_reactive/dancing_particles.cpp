@@ -1,10 +1,63 @@
-// 03-10-2024
-
 // Yuehao Gao | MAT201B
-// 2022-02-23 | Final Project
-// Audio-reactive visualizer
-//
+// 2022-03-11 | Final Project
+// Audio-reactive 3D visualizer
 
+
+// Introduction
+/*
+  This is my project implementing a 3D visualizer for input music files. 
+  The project brings 2 (future: 4) distinct visual patterns that moves along the input audio signal. 
+  There is a controllable sliding parameter named "pattern" that allows changing the visual parameter from one to another. 
+  
+  --- Express Keys ---
+  [0], [1], [2]: changing visual patterns
+  [u], [i], [o]: switch between music files
+
+  --- Controllable Parameters ---
+  VisualPattern (range 0-3, acquiscent: 1): 
+    controlls the current visual pattern shown to follow the music. 
+    This parameter will automatically be floored to the lower integer by the "onAnimate" fuction.
+
+  MusicPower (range 0-8, acquiscent: 3): 
+    how strong the music affects the visual patterns,
+    you may understand this parameter as "music volume".
+
+  SpringConstant (range 0.05-2, acquiscent: 0.3): 
+    how stiff the spring is, 
+    used for pattern {1, 2, 3} for calculating according to the Hook's Law.
+
+  Pattern1CylinderRadius (range 0.2-2, acquiscent: 0.75): 
+    the radius of the cylinder, 
+    used for pattern {1}.
+
+
+  Background: 
+  The background is acquiscently all-black, and turns white according to the enveloped music volume.
+  It mimics a flashing-lighting environment of dancing halls or party venues.
+
+  Pattern 0 (Express key [0]): 
+    Two spheres seperately representing the envelopsed volume (NOT the spectrum of FFT) of the left and right channel separately. 
+    When the input signal increases, the left sphere turns larger and "redder" from white,
+    while the right sphere turns larger and "greener" from white. 
+    The amount the two spheres change color and size are controlled by the "musicPower" parameter as well. 
+    Each of the two spheres are seperately drawn with a distinct "Mesh" object in the Distributed App structure,
+    respectively named "pattern0SphereL" and "pattern0SphereR".
+
+ Pattern 1 (Express key [1]): 
+   a SINGULAR hollow cylinder made by particles that dances according spectrum of the FFT of the input audio. 
+   Specifically, from the bottom part to the top part of the particle cylinder, 
+   the particles are gradually colored from red to blue (fixed color), 
+   and dances according to the dB value from the lower frequencies to the higher frequencies on the STFT table. 
+   The position that each particle from the bottom to the top that locate themselves on the spectrum is non-linear, 
+   nor does the value of "musicForce" as higher frequencies have lower powers. 
+   How ardently the particles dance could also be controlled by the "musicPower" parameter. 
+   The sizes of the particles are also determined by the enveloped signal value of the music (average of left and right channel", 
+   just like how the background works. 
+   The cylinder is drawn by a SINGULAR Mesh called "pattern1ParticleCylinder".
+*/
+
+
+// All files, libraries, functions imported:
 #include "al/app/al_DistributedApp.hpp"
 #include "al/app/al_GUIDomain.hpp"
 #include "al_ext/statedistribution/al_CuttleboneDomain.hpp"
@@ -16,15 +69,15 @@
 #include "Gamma/Analysis.h"
 #include "Gamma/DFT.h"
 #include "Gamma/Effects.h"
-#include "Gamma/SamplePlayer.h"++
+#include "Gamma/SamplePlayer.h"
 #include <cmath>
 #include <fstream>
 #include <vector>
 
+// Name spaces and fixed parameters
 using namespace al;
 using namespace std;
 #define FFT_SIZE 4048
-
 
 const float dragFactor = 0.15;
 const float particleMass = 3.0;
@@ -38,14 +91,11 @@ const float pattern1AngleIncrement = 2.0 * M_PI / pattern1CylinderNumParticlePer
 const float pattern1CylinderHalfLength = 0.5;
 vector<Vec3f> pattern1OriginalPosition;
 
-/*
-const int pattern2MostInnerLayerNumParticle = 20;
-const int pattern2NumLayers = 30;
-const float pattern2Displacement = 0.5;
-const float pattern2LayerRadiusIncrement = 1.0 / 3.0;
-*/
 
-// Common-used statements or parameters
+// -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+
+// Information shared with the "Distributed App"
 struct CommonState {
   // Public parameters for all patterns
   int pattern = 1;
@@ -64,9 +114,7 @@ struct CommonState {
   
   
   // Pattern 2 specific parameters
-  //Vec3f pattern2Position[5000];
-  //float sphereRadius;
-  //float repellingConstant;
+  // Pattern 3 specific parameters
 
 };
 
@@ -79,7 +127,6 @@ Vec3f randomVec3f(float scale) {
 string slurp(string fileName);  // forward declaration
 
 
-
 // -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
 
@@ -87,9 +134,9 @@ struct MyApp : DistributedAppWithState<CommonState> {
   // ----------- All parameters Start -----------
   Parameter valueL{"value_left", 0, 0, 1};
   Parameter valueR{"value_right", 0, 0, 1};
-  Parameter pattern{"visual_pattern", 1, 0, 3};     // This will be limited to int only
-  Parameter musicPower{"/musicPower", "", 3.0, 0.1, 8.0};
   Parameter pointSize{"/pointSize", "", 0.5, 0.1, 1.5};
+  Parameter pattern{"visual_pattern", 1, 0, 3};     // This will be limited to int only
+  Parameter musicPower{"/musicPower", "", 3.0, 0.0, 8.0};
   Parameter springConstant{"/springConstant", "", 0.3, 0.05, 2.0};
   Parameter pattern1CylinderRadius{"/cylinderRadius", "", 0.75, 0.2, 2.0};
   // Parameter sphereRadius{"/sphereRadius", "", 2.0, 0.5, 4.0};
@@ -121,8 +168,6 @@ struct MyApp : DistributedAppWithState<CommonState> {
   Vec3f pattern1Force[pattern1NumParticle];
 
   // * Pattern 2:
-  // Mesh pattern2ParticleBall;
-  // Vec3f pattern2SphereCenter = {0.0, 0.0, 0.0};
 
   // * Pattern 3:
   // ------------------------------------
@@ -163,11 +208,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       state().springConstant = springConstant;
       gui.add(pattern1CylinderRadius);
       state().pattern1CylinderRadius = pattern1CylinderRadius;
-      // gui.add(sphereRadius);
-      // gui.add(repellingConstant);
 
-      // Declare the size of the spectrums
-      //state().spectrum.resize(FFT_SIZE / 2 + 1);
     }
 
   }
@@ -282,6 +323,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       greenColorChange = 2.0;
     } 
 
+    
     // Show different pattern according to the "pattern" value
     switch((int)(state().pattern)) {
       case 0:
@@ -330,16 +372,21 @@ struct MyApp : DistributedAppWithState<CommonState> {
       pattern = flooredPatternIndex;
       state().pattern = pattern;
       
-      // Pattern 1:
+      // Pattern 1: --------------------------------------------------------------------------
       // Deal with all the particle forces
       vector<Vec3f> &pattern1PositionVec(pattern1ParticleCylinder.vertices());
       for (int i = 0; i < pattern1PositionVec.size(); i++) {
-        // Add spring force to particles' original positions
+
+        // Add spring force to particles
+        // According to their original positions and current positions
         Vec3f centerAtItsLayer = {0.0, pattern1PositionVec[i].y, 0.0};
         Vec3f particleToCenter = centerAtItsLayer - pattern1PositionVec[i];
         float distanceToSurface = particleToCenter.mag() - pattern1CylinderRadius;
         Vec3f springForce = particleToCenter.normalize() * springConstant * distanceToSurface;
         pattern1Force[i] += springForce;
+
+        // Add the reverse the force caused by acceleration
+        pattern1Force[i] -= pattern1Velocity[i] * dragFactor;
       
 
         // Important: add the force excerted by audio
@@ -356,7 +403,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
         pattern1Force[i] -= Vec3f(pattern1OriginalPosition[i].x, 0.0, pattern1OriginalPosition[i].z) * fftForce * state().musicPower;
         
         pattern1Velocity[i] += pattern1Force[i] / particleMass * timeStep;
-        pattern1Force[i] -= pattern1Velocity[i] * dragFactor;            // Dimish the force due to acceleration
+        
 
         // Exert the force and accelerations
         pattern1PositionVec[i] += pattern1Velocity[i] * timeStep;        // Move the particle locally
