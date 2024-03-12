@@ -24,7 +24,7 @@
     how strong the music affects the visual patterns,
     you may understand this parameter as "music volume".
 
-  SpringConstant (range 0.05 - 2, acquiscent: 0.3): 
+  SpringConstant (range 0.05 - 2, acquiscent: 0.6): 
     how stiff the spring is, 
     used for pattern {1, 2, 3} for calculating according to the Hooke's Law.
 
@@ -62,7 +62,6 @@
 
 // ---- TO DO -----
 // fix the minor bug for pattern 1: the particles should not float horizontally
-// fix the 167 broken numbers
 // implement pattern 2
 // implement pattern 3
 // make the music selection system by "dropdown list" instead of triple express keys
@@ -96,12 +95,11 @@ const float particleMass = 3.0;
 const float sphereSize = 0.8;
 const float timeStep = 1.0;
 
-const int pattern1CylinderHeight = 56;
-const int pattern1CylinderNumParticlePerlayer = 80;
+const int pattern1CylinderHeight = 50;
+const int pattern1CylinderNumParticlePerlayer = 89;
 const int pattern1NumParticle = pattern1CylinderHeight * pattern1CylinderNumParticlePerlayer;
 const float pattern1AngleIncrement = 2.0 * M_PI / pattern1CylinderNumParticlePerlayer;
-const float pattern1CylinderHalfLength = 0.5;
-vector<Vec3f> pattern1OriginalPosition;
+const float pattern1CylinderHalfLength = 0.4;
 
 
 int frameCount = 0;
@@ -153,8 +151,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
   Parameter valueR{"value_right", 0, 0, 1};
   Parameter pointSize{"/pointSize", "", 0.5, 0.1, 1.5};
   Parameter pattern{"visual_pattern", 1, 0, 3};     // This will be limited to int only
-  Parameter musicPower{"/musicPower", "", 0.0, 0.0, 6.0};
-  Parameter springConstant{"/springConstant", "", 0.3, 0.05, 2.0};
+  Parameter musicPower{"/musicPower", "", 3.0, 0.0, 6.0};
+  Parameter springConstant{"/springConstant", "", 0.6, 0.05, 2.0};
   Parameter pattern1CylinderRadius{"/cylinderRadius", "", 0.75, 0.2, 2.0};
   // Parameter sphereRadius{"/sphereRadius", "", 2.0, 0.5, 4.0};
   // Parameter repellingConstant{"/repellingConstant", "", 0.0, 0.0, 0.01};
@@ -215,12 +213,12 @@ struct MyApp : DistributedAppWithState<CommonState> {
       state().valueL = valueL;
       gui.add(valueR);
       state().valueR = valueR;
+      gui.add(pointSize);
+      state().pointSize = pointSize;
       gui.add(pattern);
       state().pattern = pattern;
       gui.add(musicPower);
       state().musicPower = musicPower;
-      gui.add(pointSize);
-      state().pointSize = pointSize;
       gui.add(springConstant);
       state().springConstant = springConstant;
       gui.add(pattern1CylinderRadius);
@@ -268,7 +266,6 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
         // Place the particle's position
         pattern1ParticleCylinder.vertex(Vec3f(x, y, z));        // Push the position into the mesh
-        pattern1OriginalPosition.push_back(Vec3f(x, y, z));     // Local archive
         state().pattern1RealTimePosition[i] = Vec3f(x, y, z);   // Common real-time position
 
         // Color the particle
@@ -366,7 +363,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
     switch((int)(state().pattern)) {
       case 0:
         g.pushMatrix();
-        g.translate(-1.0, 0, 0);
+        g.translate(-1.0, 0, -5.0);
         g.scale(sphereSize * state().valueL * state().musicPower * 1.5);
         //g.lighting(true);
         g.color(RGB(1.0, 1.0 - pow(redColorChange, 2.0), 1.0 - pow(redColorChange, 2.0)));
@@ -374,7 +371,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
         g.popMatrix();
 
         g.pushMatrix();
-        g.translate(1.0, 0, 0);
+        g.translate(1.0, 0, -5.0);
         g.scale(sphereSize * state().valueR * state().musicPower * 1.5);
         //g.lighting(true);
         g.color(RGB(1.0 - pow(greenColorChange, 2.0), 1.0, 1.0 - pow(greenColorChange, 2.0)));
@@ -431,59 +428,33 @@ struct MyApp : DistributedAppWithState<CommonState> {
         Vec3f centerAtItsLayer = {0.0, pattern1PositionVec[i].y, 0.0};
         Vec3f particleToCenter = centerAtItsLayer - pattern1PositionVec[i];
         float distanceToSurface = particleToCenter.mag() - pattern1CylinderRadius;
-        Vec3f springForce = particleToCenter.normalize() * springConstant * distanceToSurface;
-        pattern1Force[i] += springForce;
+        Vec3f inNOutspringForce = particleToCenter.normalize() * springConstant * distanceToSurface;
+        pattern1Force[i] += inNOutspringForce;
 
         // Add the reverse the force caused by acceleration
         pattern1Force[i] -= pattern1Velocity[i] * dragFactor;
       
         // Important: add the force excerted by audio
-        int positionInSpectrum = 2 + std::floor(pow(i, 2.15) / 36000);
+        int positionInSpectrum = 2 + std::floor(pow(i, 2.0) / 28000);
         //int positionInSpectrum = (int) (FFT_SIZE * 0.5 * ((pattern1PositionVec[i].y + pattern1CylinderHalfLength) / (2 * pattern1CylinderHalfLength))) - 0.5 * FFT_SIZE;
 
         float musicForce = state().spectrum[positionInSpectrum];
         float indexForceBoostLimit = 3.0;
-        float fftForce = ((pow(i, 1.5)) / 100000.0) * musicForce;
+        float fftForce = ((pow(i, 1.5)) / 300000.0) * musicForce;
         if (fftForce > indexForceBoostLimit ) {
           fftForce = indexForceBoostLimit;
         }
-        pattern1Force[i] -= Vec3f(pattern1OriginalPosition[i].x, 0.0, pattern1OriginalPosition[i].z) * fftForce * state().musicPower;
+
+        float bassBoost = 4.0 - 3.0 * ((pattern1PositionVec.size() - i) / pattern1PositionVec.size());
+
+        
+        pattern1Force[i] -= Vec3f(pattern1PositionVec[i].x, 0.0, pattern1PositionVec[i].z) * fftForce * state().musicPower * bassBoost;
         pattern1Velocity[i] += pattern1Force[i] / particleMass * timeStep;
 
         // Exert the force and accelerations
-        pattern1PositionVec[i] += pattern1Velocity[i] * timeStep;        // Move the particle locally
-        
-        // POSITION IN SPECTRUM: GOOD
-        // MUSIC FORCE: GOOD
-        // TIME STEP: GOOD
-        // PARTICLE MASS: GOOD
-        // DIST TO SURFACE: GOOD
-        // PARTICLE TO CENTER: GOOD
+        // Move the particle locally
+        pattern1PositionVec[i] += pattern1Velocity[i] * timeStep;        
 
-          // if (isnan(springForce.x)) {
-          //    cout << "NAN SPRING X is at particle indexed: " << i << endl;
-          // }
-
-          // if (isnan(springForce.y)) {
-          //    cout << "NAN SPRING Y is at particle indexed: " << i << endl;
-          // }
-
-          // if (isnan(springForce.z)) {
-          //    cout << "NAN SPRING Z is at particle indexed: " << i << endl;
-          // }
-
-
-        
-          // if (isnan(pattern1PositionVec[i].x)) {
-          //   cout << "NAN X is at particle indexed: " << i << endl;
-          // }
-          // if (isnan(pattern1PositionVec[i].y)) {
-          //   cout << "NAN Y is at particle indexed: " << i << endl;
-          // }
-          // if (isnan(pattern1PositionVec[i].z)) {
-          //   cout << "NAN Z is at particle indexed: " << i << endl;
-          // }
-        
       }
 
       
@@ -501,31 +472,24 @@ struct MyApp : DistributedAppWithState<CommonState> {
       state().springConstant = springConstant;
       state().pattern1CylinderRadius = pattern1CylinderRadius;
 
+      // Tell the distributed app about it
       for (int i = 0; i < pattern1NumParticle; i++) {
-        state().pattern1RealTimePosition[i] = pattern1PositionVec[i];    // Tell the distributed app about it
+        state().pattern1RealTimePosition[i] = pattern1PositionVec[i];    
       }
    
     } else {
-      nav().set(state().pose);
       // Unify the position and hue of distributed app
       // Clear the mesh from previous frame
+      nav().set(state().pose);
       pattern1ParticleCylinder.vertices().clear();
       pattern1ParticleCylinder.colors().clear();
 
-      int nanupdated = 0;  // USED FOR DEBUGGING
-
       for (int i = 0; i < pattern1NumParticle; i++) {
-        // Update each particle's position and 
+        // Update each particle's position and color
         pattern1ParticleCylinder.vertex(state().pattern1RealTimePosition[i]);
         pattern1ParticleCylinder.color(state().pattern1FixedColors[i]);
-
-        if (isnan(state().pattern1RealTimePosition[i].x)) {
-          nanupdated++; // USED FOR DEBUGGING
-        }
-        
-        
       }
-      //cout << nanupdated << endl;
+
     }
 
   }
