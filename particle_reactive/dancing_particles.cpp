@@ -20,7 +20,7 @@
     controlls the current visual pattern shown to follow the music. 
     This parameter will automatically be floored to the lower integer by the "onAnimate" fuction.
 
-  MusicPower (range 0 - 8, acquiscent: 3): 
+  MusicPower (range 0 - 6, acquiscent: 3): 
     how strong the music affects the visual patterns,
     you may understand this parameter as "music volume".
 
@@ -153,7 +153,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
   Parameter valueR{"value_right", 0, 0, 1};
   Parameter pointSize{"/pointSize", "", 0.5, 0.1, 1.5};
   Parameter pattern{"visual_pattern", 1, 0, 3};     // This will be limited to int only
-  Parameter musicPower{"/musicPower", "", 0.0, 0.0, 8.0};
+  Parameter musicPower{"/musicPower", "", 0.0, 0.0, 6.0};
   Parameter springConstant{"/springConstant", "", 0.3, 0.05, 2.0};
   Parameter pattern1CylinderRadius{"/cylinderRadius", "", 0.75, 0.2, 2.0};
   // Parameter sphereRadius{"/sphereRadius", "", 2.0, 0.5, 4.0};
@@ -437,14 +437,12 @@ struct MyApp : DistributedAppWithState<CommonState> {
         // Add the reverse the force caused by acceleration
         pattern1Force[i] -= pattern1Velocity[i] * dragFactor;
       
-
         // Important: add the force excerted by audio
         int positionInSpectrum = 2 + std::floor(pow(i, 2.15) / 36000);
-        //int positionInSpectrum = std::floor(((pattern1PositionVec[i].y + 0.6) / 1.2) * 2025);
         //int positionInSpectrum = (int) (FFT_SIZE * 0.5 * ((pattern1PositionVec[i].y + pattern1CylinderHalfLength) / (2 * pattern1CylinderHalfLength))) - 0.5 * FFT_SIZE;
 
         float musicForce = state().spectrum[positionInSpectrum];
-        float indexForceBoostLimit = 2.5;
+        float indexForceBoostLimit = 3.0;
         float fftForce = ((pow(i, 1.5)) / 100000.0) * musicForce;
         if (fftForce > indexForceBoostLimit ) {
           fftForce = indexForceBoostLimit;
@@ -456,18 +454,25 @@ struct MyApp : DistributedAppWithState<CommonState> {
         pattern1PositionVec[i] += pattern1Velocity[i] * timeStep;        // Move the particle locally
         
         // POSITION IN SPECTRUM: GOOD
+        // MUSIC FORCE: GOOD
+        // TIME STEP: GOOD
+        // PARTICLE MASS: GOOD
+        // DIST TO SURFACE: GOOD
+        // PARTICLE TO CENTER: GOOD
 
-        //  if (isnan(musicForce)) {
-        //      cout << "NAN MUSIC FORCE is at particle indexed: " << i << endl;
-        //    }
-        //  if (isnan(state().spectrum[0])) {
-        //     cout << "NAN POS IN SPEC is at particle indexed: " << i << endl;
-        //  }
-        if (frameCount == 1) {
-          //if (i < 300) {
-            cout << i << ": " << positionInSpectrum << endl;
-          //}
-        }
+          // if (isnan(springForce.x)) {
+          //    cout << "NAN SPRING X is at particle indexed: " << i << endl;
+          // }
+
+          // if (isnan(springForce.y)) {
+          //    cout << "NAN SPRING Y is at particle indexed: " << i << endl;
+          // }
+
+          // if (isnan(springForce.z)) {
+          //    cout << "NAN SPRING Z is at particle indexed: " << i << endl;
+          // }
+
+
         
           // if (isnan(pattern1PositionVec[i].x)) {
           //   cout << "NAN X is at particle indexed: " << i << endl;
