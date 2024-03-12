@@ -14,6 +14,7 @@
   --- Express Keys ---
   [0], [1], [2]: changing visual patterns
   [u], [i], [o], [k], [l]: switch between music files
+  [p]: back to the center position (0.0, 0.0, 0.0)
 
   --- Controllable Parameters ---
   VisualPattern (range 0 - 3, acquiscent: 1): 
@@ -348,7 +349,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
     // The background changes brightness according to the volume
     float valueLAndR = state().valueL + state().valueR;
-    g.clear(0.5 * pow(valueLAndR, 1.25) * state().musicPower);
+    g.clear(0.3 * pow(valueLAndR, 1.2) * state().musicPower);
     float redColorChange = 5.0 * state().valueL;
     if (redColorChange > 2.0) {
       redColorChange = 2.0;
@@ -456,9 +457,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
       }
 
-      
 
-      pointSize = musicPower * 0.5 * (valueL + valueR);
+      pointSize = 0.15 + musicPower * 0.33 * (valueL + valueR);
 
       // Clear all accelerations
       for (auto &a : pattern1Force) a.set(0);
@@ -530,6 +530,10 @@ struct MyApp : DistributedAppWithState<CommonState> {
     if (k.key() == 'l') {
       player.load("../it.mp3");
     }
+    if (k.key() == 'p') {
+      nav().pos(0.0, 0.0, 0.0);
+    }
+
     return true; 
   }
   
