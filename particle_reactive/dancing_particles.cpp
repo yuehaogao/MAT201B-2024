@@ -32,10 +32,10 @@
     the radius of the cylinder, 
     used for pattern {1}.
 
-
+  --- Visuals ---
   Background: 
-  The background is acquiscently all-black, and turns white according to the enveloped music volume.
-  It mimics a flashing-lighting environment of dancing halls or party venues.
+    The background is acquiscently all-black, and turns white according to the enveloped music volume.
+    It mimics a flashing-lighting environment of dancing halls or party venues.
 
   Pattern 0 (Express key [0]): 
     Two spheres seperately representing the envelopsed volume (NOT the spectrum of FFT) of the left and right channel separately. 
@@ -46,7 +46,7 @@
     respectively named "pattern0SphereL" and "pattern0SphereR".
 
   Pattern 1 (Express key [1]): 
-    a SINGULAR hollow cylinder made by particles that dances according spectrum of the FFT of the input audio. 
+    A SINGULAR hollow cylinder made by particles that dances according spectrum of the FFT of the input audio. 
     Specifically, from the bottom part to the top part of the particle cylinder, 
     the particles are gradually colored from red to blue (fixed color), 
     and dances according to the dB value from the lower frequencies to the higher frequencies on the STFT table. 
@@ -60,10 +60,9 @@
 
 
 
-
 // ---- TO DO -----
-// fixed the minor bug for pattern 1: the particles should not float horizontally
-// 
+// fix the minor bug for pattern 1: the particles should not float horizontally
+// fix the 167 broken numbers
 // implement pattern 2
 // implement pattern 3
 // make the music selection system by "dropdown list" instead of triple express keys
@@ -104,6 +103,8 @@ const float pattern1AngleIncrement = 2.0 * M_PI / pattern1CylinderNumParticlePer
 const float pattern1CylinderHalfLength = 0.5;
 vector<Vec3f> pattern1OriginalPosition;
 
+int frameCount = 0;
+
 
 // -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
@@ -112,12 +113,13 @@ vector<Vec3f> pattern1OriginalPosition;
 struct CommonState {
   // Public parameters for all patterns
   int pattern;                             // The visual pattern, either being 0, 1, 2, or 3
+  Pose pose;                               // The position and angel of the "camera"
   float valueL;                            // Envelopsed right channel value
   float valueR;                            // Enveloped left channel value
   float musicPower;                        // The "volume" of music: how much the music affect visual patterns
   float pointSize;                         // The size of the particles
   float springConstant;                    // The spring constant for Hooke's Law
-  float spectrum[FFT_SIZE / 2 + 500];      // The added number is arbitrarily decided
+  float spectrum[FFT_SIZE / 2 + 100];      // The added number is arbitrarily decided
 
   // Pattern 1 specific parameters
   float pattern1CylinderRadius;            // The radius of the cylinder
@@ -127,13 +129,15 @@ struct CommonState {
   
   // Pattern 2 specific parameters
   // Pattern 3 specific parameters
-  Pose pose;
+  
 };
+
 
 // To generate a random 3D vector for position, color, ...
 Vec3f randomVec3f(float scale) {
   return Vec3f(rnd::uniformS(), rnd::uniformS(), rnd::uniformS()) * scale;
 }
+
 
 // To slurp a file (initialized)
 string slurp(string fileName);  // forward declaration
@@ -225,6 +229,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
   }
 
+
   // onCreate
   // Create all the initial visual patterns
   // Slurp corresponding files for the point shader program
@@ -232,60 +237,77 @@ struct MyApp : DistributedAppWithState<CommonState> {
   // Initialize the position of camera
   //
   void onCreate() override { 
-    bool worked = pointShader.compile(slurp("../point-vertex.glsl"),
+    bool createPointShaderSuccess = pointShader.compile(slurp("../point-vertex.glsl"),
                           slurp("../point-fragment.glsl"),
                           slurp("../point-geometry.glsl"));
 
-      if (!worked) {
-        exit(1);
-      }
+    if (!createPointShaderSuccess) {
+      exit(1);
+    }
 
 
-      // ----------- Initialize Parameters for All Meshes Begins -------------
+    // ----------- Initialize Parameters for All Meshes Begins -------------
 
-      // Pattern 0: move the two spheres seperately to the left and right
+    // Pattern 0: move the two spheres seperately to the left and right
 
 
-      // Pattern 1: create all the particles with their initial positions, colors, velocity, and forces
+    // Pattern 1: create all the particles with their initial positions, colors, velocity, and forces
       
 
-      // Here, "i" means the index of the article, from 0 to the last one
-      int i = 0;
-  
-      for (int layerIndex = 0; layerIndex < pattern1CylinderHeight; layerIndex++) {
-        float y = -1.0 * pattern1CylinderHalfLength + (2.0 * pattern1CylinderHalfLength / pattern1CylinderHeight) * layerIndex;
+    // Here, "i" means the index of the article, from 0 to the last one
+    int i = 0;
+    
+    //int nanInitialized = 0;
+
+    for (int layerIndex = 0; layerIndex < pattern1CylinderHeight; layerIndex++) {
+      float y = -1.0 * pattern1CylinderHalfLength + (2.0 * pattern1CylinderHalfLength / pattern1CylinderHeight) * layerIndex;
       
-        for (int particleIndex = 0; particleIndex < pattern1CylinderNumParticlePerlayer; particleIndex++) {
-          float angle = particleIndex * pattern1AngleIncrement;
-          float x = pattern1CylinderRadius * cos(angle);
-          float z = pattern1CylinderRadius * sin(angle);
+      for (int particleIndex = 0; particleIndex < pattern1CylinderNumParticlePerlayer; particleIndex++) {
+        float angle = particleIndex * pattern1AngleIncrement;
+        float x = pattern1CylinderRadius * cos(angle);
+        float z = pattern1CylinderRadius * sin(angle);
 
-          // Place the particle's position
-          pattern1ParticleCylinder.vertex(Vec3f(x, y, z));        // Push the position into the mesh
-          pattern1OriginalPosition.push_back(Vec3f(x, y, z));     // Local archive
-          state().pattern1RealTimePosition[i] = Vec3f(x, y, z);   // Common real-time position
+        // Place the particle's position
+        pattern1ParticleCylinder.vertex(Vec3f(x, y, z));        // Push the position into the mesh
+        pattern1OriginalPosition.push_back(Vec3f(x, y, z));     // Local archive
+        state().pattern1RealTimePosition[i] = Vec3f(x, y, z);   // Common real-time position
 
-          // Color the particle
-          float hue = 0.7 / pattern1CylinderHeight * layerIndex;
-          pattern1ParticleCylinder.color(HSV(hue, 1.0f, 1.0f));
-          state().pattern1FixedColors[i] = HSV(hue, 1.0f, 1.0f);       
+        // Color the particle
+        float hue = 0.7 / pattern1CylinderHeight * layerIndex;
+        pattern1ParticleCylinder.color(HSV(hue, 1.0f, 1.0f));
+        state().pattern1FixedColors[i] = HSV(hue, 1.0f, 1.0f);       
 
-          // Set the particle's physical force system
-          pattern1ParticleCylinder.texCoord(pow(particleMass, 1.0f / 3), 0);
-          pattern1Velocity[i] = Vec3f(0.0, 0.0, 0.0);
-          pattern1Force[i] = Vec3f(0.0, 0.0, 0.0);
-          i++;
+        // Set the particle's physical force system
+        pattern1ParticleCylinder.texCoord(pow(particleMass, 1.0f / 3), 0);
+        pattern1Velocity[i] = Vec3f(0.0, 0.0, 0.0);
+        pattern1Force[i] = Vec3f(0.0, 0.0, 0.0);
+        i++;
+ 
+        /*
+        if (isnan(state().pattern1RealTimePosition[i].x)) {
+          nanInitialized++; // USED FOR DEBUGGING
         }
-      }
+        */
 
+      }
+    }
+
+    //cout << "Invalid Value Initialized: " << nanInitialized << endl;
+
+    // Pattern 2: ...
+    // Pattern 3: ...
+    
+    // ----------- Initialize Parameters for All Meshes Ends -------------
+
+
+    // Add the shapes and points
+    // These should be sent to BOTH primary and secondary sites
+    addSphere(pattern0SphereL);
+    addSphere(pattern0SphereR);
+    pattern1ParticleCylinder.primitive(Mesh::POINTS);
+
+    // LOCAL-ONLY initialization process
     if (isPrimary()) {
-      
-    
-      // Pattern 2: ...
-      // Pattern 3: ...
-    
-      // ----------- Initialize Parameters for All Meshes Ends -------------
-  
       // Set the magnitude of the envelop followers
       followLeft.lag(0.5); 
       followRight.lag(0.5);
@@ -293,12 +315,9 @@ struct MyApp : DistributedAppWithState<CommonState> {
       // Initialize the position of "camera"
       nav().pos(0, 0, 0.0);
     }
-
-  // do this in both primary and secondary
-    addSphere(pattern0SphereL);
-    addSphere(pattern0SphereR);
-    pattern1ParticleCylinder.primitive(Mesh::POINTS);
+    
   }
+
 
   // onSound
   // Read in the stereo sound file
@@ -330,14 +349,16 @@ struct MyApp : DistributedAppWithState<CommonState> {
     }
   }
 
+
   // onDraw
   // Decide how each frame should be drawn
   // The current frame shows which mesh(es) is depending on the "pattern" parameter
   //
   void onDraw(Graphics& g) override {
+
     // The background changes brightness according to the volume
     float valueLAndR = state().valueL + state().valueR;
-    g.clear(1.2 * pow(valueLAndR, 2.0) * state().musicPower);
+    g.clear(0.5 * pow(valueLAndR, 1.25) * state().musicPower);
     float redColorChange = 5.0 * state().valueL;
     if (redColorChange > 2.0) {
       redColorChange = 2.0;
@@ -347,14 +368,6 @@ struct MyApp : DistributedAppWithState<CommonState> {
       greenColorChange = 2.0;
     } 
 
-    Mesh m;
-    addSphere(m, 0.1);
-    g.color(1, 0, 0);
-    g.draw(m);
-
-
-
-    
     // Show different pattern according to the "pattern" value
     switch((int)(state().pattern)) {
       case 0:
@@ -374,30 +387,38 @@ struct MyApp : DistributedAppWithState<CommonState> {
         g.draw(pattern0SphereR);
         g.popMatrix();
         break;
+
       case 1:
         g.shader(pointShader);
         g.shader().uniform("pointSize", state().pointSize / 100);
-        //cout << state().pointSize << endl;
         g.blending(true);
         g.blendTrans();
         g.depthTesting(true);
         g.draw(pattern1ParticleCylinder);
         break;
+
       case 2:
         break;
+
       case 3:
         break;
     }
 
   }
 
+
   // onAnimate
   // Decides the logic between the current frame to the next frame
   // For pattern 2, 3: calculate the new force excerted on each particle
   //
-  void onAnimate(double dt) override {
+  void onAnimate(double dt) override { 
+
+    frameCount++;
+
     if (isPrimary()) {
+      // Update the camera position
       state().pose = nav();
+
       // Set the parameter of "pattern" to its floored-down int value
       // Unify local data with "state" data (only pattern)
       int flooredPatternIndex = (int) (std::floor(pattern));
@@ -406,6 +427,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
       
       // Pattern 1: --------------------------------------------------------------------------
       // Deal with all the particle forces
+
+
       vector<Vec3f> &pattern1PositionVec(pattern1ParticleCylinder.vertices());
       for (int i = 0; i < pattern1PositionVec.size(); i++) {
 
@@ -427,21 +450,27 @@ struct MyApp : DistributedAppWithState<CommonState> {
         //int positionInSpectrum = (int) (FFT_SIZE * 0.5 * ((pattern1PositionVec[i].y + pattern1CylinderHalfLength) / (2 * pattern1CylinderHalfLength))) - 0.5 * FFT_SIZE;
 
         float musicForce = state().spectrum[positionInSpectrum];
-        float indexForceBoostLimit = 3.0;
+        float indexForceBoostLimit = 2.5;
         float fftForce = ((pow(i, 1.5)) / 100000.0) * musicForce;
         if (fftForce > indexForceBoostLimit ) {
           fftForce = indexForceBoostLimit;
         }
         pattern1Force[i] -= Vec3f(pattern1OriginalPosition[i].x, 0.0, pattern1OriginalPosition[i].z) * fftForce * state().musicPower;
-        
         pattern1Velocity[i] += pattern1Force[i] / particleMass * timeStep;
-        
 
         // Exert the force and accelerations
         pattern1PositionVec[i] += pattern1Velocity[i] * timeStep;        // Move the particle locally
         
 
+        if (frameCount <= 10) {
+          if (isnan(pattern1PositionVec[i].x)) {
+            cout << "NAN X is at particle indexed: " << i << endl;
+          }
+        }
+
       }
+
+      
 
       pointSize = musicPower * 0.5 * (valueL + valueR);
 
@@ -456,40 +485,44 @@ struct MyApp : DistributedAppWithState<CommonState> {
       state().springConstant = springConstant;
       state().pattern1CylinderRadius = pattern1CylinderRadius;
 
-
-   
       for (int i = 0; i < pattern1NumParticle; i++) {
         state().pattern1RealTimePosition[i] = pattern1PositionVec[i];    // Tell the distributed app about it
       }
-      //pattern1PositionVec[0].print();
-       //cout << endl;
+   
     } else {
       nav().set(state().pose);
-      //nav().print();
-
       // Unify the position and hue of distributed app
       // Clear the mesh from previous frame
       pattern1ParticleCylinder.vertices().clear();
       pattern1ParticleCylinder.colors().clear();
-      int nan = 0;
+
+      int nanupdated = 0;  // USED FOR DEBUGGING
+
       for (int i = 0; i < pattern1NumParticle; i++) {
-        // Update each particle's position
+        // Update each particle's position and 
         pattern1ParticleCylinder.vertex(state().pattern1RealTimePosition[i]);
         pattern1ParticleCylinder.color(state().pattern1FixedColors[i]);
 
         if (isnan(state().pattern1RealTimePosition[i].x)) {
-          nan++;
+          nanupdated++; // USED FOR DEBUGGING
         }
         
+        
       }
-      //cout << nan << endl;
-      //state().pattern1RealTimePosition[0].print();
-      //cout << endl;
+      //cout << nanupdated << endl;
     }
 
   }
 
+  // onMessage
+  // When the system receives an input message
+  //
   void onMessage(osc::Message& m) override { m.print(); }
+
+  
+  // onKeyDown
+  // React to any key pressed by the user
+  //
   bool onKeyDown(const Keyboard& k) override { 
     if (k.key() == '0') {
       pattern = 0;
@@ -512,13 +545,21 @@ struct MyApp : DistributedAppWithState<CommonState> {
     if (k.key() == 'o') {
       player.load("../lf.mp3");
     }
+    if (k.key() == 'k') {
+      player.load("../dc.mp3");
+    }
+    if (k.key() == 'l') {
+      player.load("../it.mp3");
+    }
     return true; 
   }
   
 };
 
+
 // slurp
 // To slurp from a file
+//
 string slurp(string fileName) {
   fstream file(fileName);
   string returnValue = "";
