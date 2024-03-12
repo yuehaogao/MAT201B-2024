@@ -458,7 +458,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       }
 
 
-      pointSize = 0.12 + musicPower * 0.3 * pow((valueL + valueR), 0.8);
+      pointSize = 0.12 + musicPower * 0.3 * pow((valueL + valueR), 0.6);
 
       // Clear all accelerations
       for (auto &a : pattern1Force) a.set(0);
