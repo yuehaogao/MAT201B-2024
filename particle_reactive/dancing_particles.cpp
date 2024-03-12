@@ -111,7 +111,7 @@ vector<Vec3f> pattern1OriginalPosition;
 // Information shared with the "Distributed App"
 struct CommonState {
   // Public parameters for all patterns
-  int pattern = 1;
+  int pattern;
   float valueL;
   float valueR;
   float musicPower;
@@ -122,7 +122,7 @@ struct CommonState {
   // Pattern 1 specific parameters
   float pattern1CylinderRadius;
   Vec3f pattern1RealTimePosition[5000];
-  HSV pattern1Colors[5000];
+  HSV pattern1FixedColors[5000];
   
   
   // Pattern 2 specific parameters
@@ -265,7 +265,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
           // Color the particle
           float hue = 0.7 / pattern1CylinderHeight * layerIndex;
           pattern1ParticleCylinder.color(HSV(hue, 1.0f, 1.0f));
-          state().pattern1Colors[i] = HSV(hue, 1.0f, 1.0f);       
+          state().pattern1FixedColors[i] = HSV(hue, 1.0f, 1.0f);       
 
           // Set the particle's physical force system
           pattern1ParticleCylinder.texCoord(pow(particleMass, 1.0f / 3), 0);
