@@ -103,7 +103,6 @@ const float pattern1AngleIncrement = 2.0 * M_PI / pattern1CylinderNumParticlePer
 const float pattern1CylinderHalfLength = 0.5;
 vector<Vec3f> pattern1OriginalPosition;
 
-int frameCount = 0;
 
 
 // -----------------------------------------------------------------------------
@@ -152,7 +151,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
   Parameter valueR{"value_right", 0, 0, 1};
   Parameter pointSize{"/pointSize", "", 0.5, 0.1, 1.5};
   Parameter pattern{"visual_pattern", 1, 0, 3};     // This will be limited to int only
-  Parameter musicPower{"/musicPower", "", 3.0, 0.0, 8.0};
+  Parameter musicPower{"/musicPower", "", 0.0, 0.0, 8.0};
   Parameter springConstant{"/springConstant", "", 0.3, 0.05, 2.0};
   Parameter pattern1CylinderRadius{"/cylinderRadius", "", 0.75, 0.2, 2.0};
   // Parameter sphereRadius{"/sphereRadius", "", 2.0, 0.5, 4.0};
@@ -256,8 +255,6 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
     // Here, "i" means the index of the article, from 0 to the last one
     int i = 0;
-    
-    //int nanInitialized = 0;
 
     for (int layerIndex = 0; layerIndex < pattern1CylinderHeight; layerIndex++) {
       float y = -1.0 * pattern1CylinderHalfLength + (2.0 * pattern1CylinderHalfLength / pattern1CylinderHeight) * layerIndex;
@@ -282,12 +279,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
         pattern1Velocity[i] = Vec3f(0.0, 0.0, 0.0);
         pattern1Force[i] = Vec3f(0.0, 0.0, 0.0);
         i++;
- 
-        /*
-        if (isnan(state().pattern1RealTimePosition[i].x)) {
-          nanInitialized++; // USED FOR DEBUGGING
-        }
-        */
+
 
       }
     }
@@ -413,8 +405,6 @@ struct MyApp : DistributedAppWithState<CommonState> {
   //
   void onAnimate(double dt) override { 
 
-    frameCount++;
-
     if (isPrimary()) {
       // Update the camera position
       state().pose = nav();
@@ -461,13 +451,25 @@ struct MyApp : DistributedAppWithState<CommonState> {
         // Exert the force and accelerations
         pattern1PositionVec[i] += pattern1Velocity[i] * timeStep;        // Move the particle locally
         
+        
 
-        if (frameCount <= 10) {
-          if (isnan(pattern1PositionVec[i].x)) {
-            cout << "NAN X is at particle indexed: " << i << endl;
-          }
-        }
-
+        // if (isnan(musicForce)) {
+        //     cout << "NAN MUSIC FORCE is at particle indexed: " << i << endl;
+        //   }
+         // if (isnan(positionInSpectrum)) {
+            //cout << "NAN POS IN SPEC is at particle indexed: " << i << endl;
+         // }
+        
+          // if (isnan(pattern1PositionVec[i].x)) {
+          //   cout << "NAN X is at particle indexed: " << i << endl;
+          // }
+          // if (isnan(pattern1PositionVec[i].y)) {
+          //   cout << "NAN Y is at particle indexed: " << i << endl;
+          // }
+          // if (isnan(pattern1PositionVec[i].z)) {
+          //   cout << "NAN Z is at particle indexed: " << i << endl;
+          // }
+        
       }
 
       
