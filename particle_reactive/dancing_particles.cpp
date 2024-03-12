@@ -445,7 +445,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
           fftForce = indexForceBoostLimit;
         }
 
-        float bassBoost = 4.0 - 3.0 * ((pattern1PositionVec.size() - i) / pattern1PositionVec.size());
+        float bassBoost = 3.0 - 2.0 * ((pattern1PositionVec.size() - i) / pattern1PositionVec.size());
 
         
         pattern1Force[i] -= Vec3f(pattern1PositionVec[i].x, 0.0, pattern1PositionVec[i].z) * fftForce * state().musicPower * bassBoost;
@@ -458,7 +458,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       }
 
 
-      pointSize = 0.15 + musicPower * 0.33 * (valueL + valueR);
+      pointSize = 0.12 + musicPower * 0.3 * pow((valueL + valueR), 0.8);
 
       // Clear all accelerations
       for (auto &a : pattern1Force) a.set(0);
