@@ -11,7 +11,7 @@
   This is my project implementing a 3D visualizer for input music files. 
   The project brings 2 (future: 4) distinct visual patterns that moves along the input audio signal.
   
-  --- Express Keys ---
+  --- Express Shortcut Keys ---
   [0], [1], [2]: changing visual patterns
   [u], [i], [o], [k], [l]: switch between music files
   [p]: back to the center position (0.0, 0.0, 0.0)
@@ -64,6 +64,8 @@
 // ---- TO DO -----
 // implement pattern 2
 // implement pattern 3
+// express p: rotate to original as well
+// how to enable different point size in the same mesh?
 // make the music selection system by "dropdown list" instead of triple express keys
 
 
@@ -99,10 +101,11 @@ const int pattern1CylinderHeight = 50;
 const int pattern1CylinderNumParticlePerlayer = 89;
 const int pattern1NumParticle = pattern1CylinderHeight * pattern1CylinderNumParticlePerlayer;
 const float pattern1AngleIncrement = 2.0 * M_PI / pattern1CylinderNumParticlePerlayer;
-const float pattern1CylinderHalfLength = 0.4;
+const float pattern1CylinderHalfLength = 0.6;
 
+const int pattern2NumParticle = 3600;
 
-int frameCount = 0;
+int frameCount = 0;  // used for debugging only
 
 
 // -----------------------------------------------------------------------------
@@ -125,8 +128,11 @@ struct CommonState {
   Vec3f pattern1RealTimePosition[5000];    // The updated (at this moment) position of each particle on the cylinder
   HSV pattern1FixedColors[5000];           // The fixed color (HSV) of each particle on the cylinder
   
-  
   // Pattern 2 specific parameters
+  float pattern2SphereRadius;              // The radius of the singular enclosing sphere
+  Vec3f pattern2RealTimePosition[4000];    // The updated (at this moment) position of each particle on the sphere
+  HSV pattern2RealTimeColors[4000];        // The updated (at this moment) color of each particle on the sphere
+
   // Pattern 3 specific parameters
   
 };
@@ -151,10 +157,10 @@ struct MyApp : DistributedAppWithState<CommonState> {
   Parameter valueR{"value_right", 0, 0, 1};
   Parameter pointSize{"/pointSize", "", 0.5, 0.1, 1.5};
   Parameter pattern{"visual_pattern", 1, 0, 3};     // This will be limited to int only
-  Parameter musicPower{"/musicPower", "", 3.0, 0.0, 6.0};
+  Parameter musicPower{"/musicPower", "", 2.5, 0.0, 6.0};
   Parameter springConstant{"/springConstant", "", 0.6, 0.05, 2.0};
-  Parameter pattern1CylinderRadius{"/cylinderRadius", "", 0.75, 0.2, 2.0};
-  // Parameter sphereRadius{"/sphereRadius", "", 2.0, 0.5, 4.0};
+  Parameter pattern1CylinderRadius{"/cylinderRadius", "", 1.2, 0.2, 2.0};
+  Parameter pattern2SphereRadius{"/sphereRadius", "", 1.0, 0.25, 3.0};
   // Parameter repellingConstant{"/repellingConstant", "", 0.0, 0.0, 0.01};
 
 
@@ -183,8 +189,12 @@ struct MyApp : DistributedAppWithState<CommonState> {
   Vec3f pattern1Force[pattern1NumParticle];
 
   // * Pattern 2:
+  Mesh pattern2ParticleSphere;
+  Vec3f pattern2Velocity[pattern2NumParticle];
+  Vec3f pattern2Force[pattern2NumParticle];
 
   // * Pattern 3:
+
   // ------------------------------------
 
 
@@ -204,7 +214,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
     if (isPrimary()) {
       // Load the sound file
-      player.load("../tv.mp3");
+      player.load("../dc.mp3");
     
       // set up GUI
       auto GUIdomain = GUIDomain::enableGUI(defaultWindowDomain());
@@ -223,6 +233,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
       state().springConstant = springConstant;
       gui.add(pattern1CylinderRadius);
       state().pattern1CylinderRadius = pattern1CylinderRadius;
+      gui.add(pattern2SphereRadius);
+      state().pattern2SphereRadius = pattern2SphereRadius;
 
     }
 
@@ -237,8 +249,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
   //
   void onCreate() override { 
     bool createPointShaderSuccess = pointShader.compile(slurp("../point-vertex.glsl"),
-                          slurp("../point-fragment.glsl"),
-                          slurp("../point-geometry.glsl"));
+                                                        slurp("../point-fragment.glsl"),
+                                                        slurp("../point-geometry.glsl"));
 
     if (!createPointShaderSuccess) {
       exit(1);
@@ -247,14 +259,12 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
     // ----------- Initialize Parameters for All Meshes Begins -------------
 
-    // Pattern 0: move the two spheres seperately to the left and right
+    // * Pattern 0: move the two spheres seperately to the left and right, executed in the "onDraw" function
 
-
-    // Pattern 1: create all the particles with their initial positions, colors, velocity, and forces
+    // * Pattern 1: create all the particles with their initial positions, colors, velocity, and forces
       
-
-    // Here, "i" means the index of the article, from 0 to the last one
-    int i = 0;
+    // Here, "p1i" means the index of the particle, from 0 to the last one
+    int p1i = 0;
 
     for (int layerIndex = 0; layerIndex < pattern1CylinderHeight; layerIndex++) {
       float y = -1.0 * pattern1CylinderHalfLength + (2.0 * pattern1CylinderHalfLength / pattern1CylinderHeight) * layerIndex;
@@ -265,28 +275,53 @@ struct MyApp : DistributedAppWithState<CommonState> {
         float z = pattern1CylinderRadius * sin(angle);
 
         // Place the particle's position
-        pattern1ParticleCylinder.vertex(Vec3f(x, y, z));        // Push the position into the mesh
-        state().pattern1RealTimePosition[i] = Vec3f(x, y, z);   // Common real-time position
+        pattern1ParticleCylinder.vertex(Vec3f(x, y, z));          // Push the position into the mesh
+        state().pattern1RealTimePosition[p1i] = Vec3f(x, y, z);   // Common real-time position
 
         // Color the particle
         float hue = 0.7 / pattern1CylinderHeight * layerIndex;
         pattern1ParticleCylinder.color(HSV(hue, 1.0f, 1.0f));
-        state().pattern1FixedColors[i] = HSV(hue, 1.0f, 1.0f);       
+        state().pattern1FixedColors[p1i] = HSV(hue, 1.0f, 1.0f);       
 
         // Set the particle's physical force system
         pattern1ParticleCylinder.texCoord(pow(particleMass, 1.0f / 3), 0);
-        pattern1Velocity[i] = Vec3f(0.0, 0.0, 0.0);
-        pattern1Force[i] = Vec3f(0.0, 0.0, 0.0);
-        i++;
+        pattern1Velocity[p1i] = Vec3f(0.0, 0.0, 0.0);
+        pattern1Force[p1i] = Vec3f(0.0, 0.0, 0.0);
 
+        // Finally, increment p1i by 1, proceed to the next particle in the mesh
+        p1i++;
 
       }
     }
 
-    //cout << "Invalid Value Initialized: " << nanInitialized << endl;
 
-    // Pattern 2: ...
+    // * Pattern 2: 
+
+    // Here, "p2i" means the index of the particle, from 0 to the last one
+    // Initialize the position and color of each particle
+    for (int p2i = 0; p2i < pattern2NumParticle; p2i++) {
+
+      // Place the particle's position (initialized with random position)
+      Vec3f randomInitPositionOfThisArticle = randomVec3f(pattern2SphereRadius);
+      pattern2ParticleSphere.vertex(randomInitPositionOfThisArticle);
+      state().pattern2RealTimePosition[p2i] = randomInitPositionOfThisArticle;
+
+      // Color the particle
+      float p2hue = 0.7 * ((randomInitPositionOfThisArticle.y + pattern2SphereRadius) / (2.0 * pattern2SphereRadius));
+      pattern2ParticleSphere.color(HSV(p2hue, 1.0f, 1.0f));
+      state().pattern2RealTimeColors[p2i] = HSV(p2hue, 1.0f, 1.0f);
+
+      // Set the particle's physical force system
+      pattern2ParticleSphere.texCoord(pow(particleMass, 1.0f / 3), 0);
+      pattern2Velocity[p2i] = Vec3f(0.0, 0.0, 0.0);
+      pattern2Force[p2i] = Vec3f(0.0, 0.0, 0.0);
+
+    }
+
+
     // Pattern 3: ...
+
+    //cout << "Invalid Value Initialized: " << nanInitialized << endl;
     
     // ----------- Initialize Parameters for All Meshes Ends -------------
 
@@ -296,6 +331,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
     addSphere(pattern0SphereL);
     addSphere(pattern0SphereR);
     pattern1ParticleCylinder.primitive(Mesh::POINTS);
+    pattern2ParticleSphere.primitive(Mesh::POINTS);
 
     // LOCAL-ONLY initialization process
     if (isPrimary()) {
@@ -319,8 +355,9 @@ struct MyApp : DistributedAppWithState<CommonState> {
       // Seperately envelop them
       // And feed into the "valueL" and "valueR" parameters
       player();
-      float sLeft = player.read(0);
-      float sRight = player.read(1);
+      float sRight = player.read(0);
+      float sLeft = player.read(1);
+      
 
       io.out(0) = sLeft;
       io.out(1) = sRight;
@@ -349,7 +386,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
     // The background changes brightness according to the volume
     float valueLAndR = state().valueL + state().valueR;
-    g.clear(0.3 * pow(valueLAndR, 1.2) * state().musicPower);
+    g.clear(0.3 * pow(valueLAndR, 0.9) * state().musicPower);
     float redColorChange = 5.0 * state().valueL;
     if (redColorChange > 2.0) {
       redColorChange = 2.0;
@@ -383,12 +420,20 @@ struct MyApp : DistributedAppWithState<CommonState> {
         g.shader(pointShader);
         g.shader().uniform("pointSize", state().pointSize / 100);
         g.blending(true);
+        //g.lighting(true);
         g.blendTrans();
         g.depthTesting(true);
         g.draw(pattern1ParticleCylinder);
         break;
 
       case 2:
+        g.shader(pointShader);
+        g.shader().uniform("pointSize", state().pointSize / 100);
+        g.blending(true);
+        //g.lighting(true);
+        g.blendTrans();
+        g.depthTesting(true);
+        g.draw(pattern2ParticleSphere);
         break;
 
       case 3:
@@ -404,7 +449,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
   //
   void onAnimate(double dt) override { 
 
-    frameCount++;
+    frameCount++;  // used for debugging only
 
     if (isPrimary()) {
       // Update the camera position
@@ -418,11 +463,9 @@ struct MyApp : DistributedAppWithState<CommonState> {
       
       // Pattern 1: --------------------------------------------------------------------------
       // Deal with all the particle forces
-
-
       vector<Vec3f> &pattern1PositionVec(pattern1ParticleCylinder.vertices());
+      
       for (int i = 0; i < pattern1PositionVec.size(); i++) {
-
         // Add spring force to particles
         // According to their original positions and current positions
         Vec3f centerAtItsLayer = {0.0, pattern1PositionVec[i].y, 0.0};
@@ -453,15 +496,34 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
         // Exert the force and accelerations
         // Move the particle locally
-        pattern1PositionVec[i] += pattern1Velocity[i] * timeStep;        
+        pattern1PositionVec[i] += pattern1Velocity[i] * timeStep; 
 
       }
 
 
-      pointSize = 0.12 + musicPower * 0.3 * pow((valueL + valueR), 0.6);
+      // Pattern 2: --------------------------------------------------------------------------
+      // Deal with all the particle forces
+      vector<Vec3f> &pattern2PositionVec(pattern2ParticleSphere.vertices());
+         
+      for (int i = 0; i < pattern2NumParticle; i++) {
+        // Add spring force to particles
+        // According to their original positions and current positions
+        Vec3f particleToCenter = Vec3f(0.0, 0.0, 0.0) - pattern2PositionVec[i];
+        float distanceToSurface = particleToCenter.mag() - pattern2SphereRadius;
+        Vec3f inNOutspringForce = particleToCenter.normalize() * springConstant * distanceToSurface;
+        pattern2Force[i] += inNOutspringForce;
 
-      // Clear all accelerations
+        pattern2Force[i] -= pattern2Velocity[i] * dragFactor;
+        pattern2Velocity[i] += pattern2Force[i] / particleMass * timeStep;
+        pattern2PositionVec[i] += pattern2Velocity[i] * timeStep;
+      }
+
+
+      pointSize = 0.12 + musicPower * 0.3 * pow((valueL + valueR), 0.45);
+
+      // Clear all forces for pattern 1, 2, 3
       for (auto &a : pattern1Force) a.set(0);
+      for (auto &a : pattern2Force) a.set(0);
 
       // Unify other parameters between local and "state"
       state().valueL = valueL;
@@ -470,19 +532,24 @@ struct MyApp : DistributedAppWithState<CommonState> {
       state().musicPower = musicPower;
       state().springConstant = springConstant;
       state().pattern1CylinderRadius = pattern1CylinderRadius;
+      state().pattern2SphereRadius = pattern2SphereRadius;
 
-      // Tell the distributed app about it
+
+      // Tell the distributed app about the refresh of every particle
       for (int i = 0; i < pattern1NumParticle; i++) {
         state().pattern1RealTimePosition[i] = pattern1PositionVec[i];    
+      }
+      for (int i = 0; i < pattern2NumParticle; i++) {
+        state().pattern2RealTimePosition[i] = pattern2PositionVec[i];    
       }
    
     } else {
       // Unify the position and hue of distributed app
       // Clear the mesh from previous frame
       nav().set(state().pose);
+
       pattern1ParticleCylinder.vertices().clear();
       pattern1ParticleCylinder.colors().clear();
-
       for (int i = 0; i < pattern1NumParticle; i++) {
         // Update each particle's position and color
         pattern1ParticleCylinder.vertex(state().pattern1RealTimePosition[i]);
@@ -532,6 +599,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
     }
     if (k.key() == 'p') {
       nav().pos(0.0, 0.0, 0.0);
+      // How to m
     }
 
     return true; 
