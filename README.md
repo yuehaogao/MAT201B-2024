@@ -33,9 +33,10 @@ The major c++ file dealing with all the algorithms is the "dancing_particles.cpp
 
 - Pattern1CylinderRadius (range 0.2-2, acquiscent: 0.75): the radius of the cylinder, used for pattern {1}.
 
+- Pattern2SphereRadius (range 0.2-2, acquiscent: 0.8): the radius of the sphere, used for pattern {2}.
+
 
 --------- Future controllable parameters ---------
-- Pattern2Size (TBD): the size of the two particle disks, used for pattern {2}.
 
 - Pattern3Radius (TBD): the radius of the two particle spheres, used for pattern {3}.
 
