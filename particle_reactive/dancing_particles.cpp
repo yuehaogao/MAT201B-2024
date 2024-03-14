@@ -134,6 +134,7 @@ struct CommonState {
   
   // Pattern 2 specific parameters
   float pattern2SphereRadius;              // The radius of the singular enclosing sphere
+  float pattern2RealTimePointSize[1200];   // The updated (at this moment) particle size on the sphere
   Vec3f pattern2RealTimePosition[1200];    // The updated (at this moment) position of each particle on the sphere
   HSV pattern2RealTimeColors[1200];        // The updated (at this moment) color of each particle on the sphere
 
@@ -377,7 +378,6 @@ struct MyApp : DistributedAppWithState<CommonState> {
         }
       }
 
-
       // https://github.com/adamstark/Gist
     }
   }
@@ -546,31 +546,21 @@ struct MyApp : DistributedAppWithState<CommonState> {
           particleHeightIndex = 10.0;
         }
 
-        int PositionInSpectrum = 2 + std::floor(pow(particleHeightIndex, 4.0) / 9);  // maybe make the devided number a sliding parameter?
-        float MusicForce = state().spectrum[PositionInSpectrum];
-        float fftForce = MusicForce * 0.1;
-
-        
-
-
-        float indexForceBoostLimit = 0.2;
+        int positionInSpectrum = 5 + std::floor(pow(particleHeightIndex, 4.0) / 12);  // maybe make the devided number a sliding parameter?
+        float musicForce = state().spectrum[positionInSpectrum];
+        float fftForce = musicForce * 0.1;
+    
+        float indexForceBoostLimit = 0.01;
         if (fftForce > indexForceBoostLimit) {
           fftForce = indexForceBoostLimit;
         }
 
-        if (frameCount > 20 && frameCount < 23) {
-          cout << particleHeightIndex << " | " << fftForce << endl;
-        }
-    
-        float p2BassBoost = 3.5 - 1.5 * ((10 - particleHeightIndex) / 10);
- 
-        pattern2Force[i] += Vec3f(pattern2PositionVec[i].x, pattern2PositionVec[i].y, pattern2PositionVec[i].z) * fftForce * p2BassBoost * state().musicPower;
+        float tweetBoost = 1.5 + 8.5 * (particleHeightIndex / 10);
+        pattern2Force[i] += Vec3f(pattern2PositionVec[i].x, pattern2PositionVec[i].y, pattern2PositionVec[i].z) * fftForce * tweetBoost * state().musicPower;
 
-
-        pattern2Velocity[i] += pattern2Force[i] / particleMass * timeStep;
+        pattern2Velocity[i] += pattern2Force[i] / particleMass * (timeStep * 0.5);
         pattern2PositionVec[i] += pattern2Velocity[i] * timeStep;
         state().pattern2RealTimePosition[i] = pattern2PositionVec[i];
-
 
         // Meanwhile, change its color according to its new position
         float yIndexForColor = state().pattern2RealTimePosition[i].y + pattern2SphereRadius;
@@ -588,7 +578,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       }
 
 
-      pointSize = 0.12 + musicPower * 0.3 * pow((valueL + valueR), 0.45);
+      pointSize = 0.1 + musicPower * 0.3 * pow((valueL + valueR), 0.4);
 
       // Clear all forces for pattern 1, 2, 3
       for (auto &a : pattern1Force) a.set(0);
