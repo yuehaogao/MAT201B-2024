@@ -15,11 +15,13 @@ The major c++ file dealing with all the algorithms is the "dancing_particles.cpp
 
 - Pattern 0 (Express key [0]): two spheres seperately representing the envelopsed volume (NOT the spectrum of FFT) of the left and right channel separately. When the input signal increases, the left sphere turns larger and "redder" from white, while the right sphere turns larger and "greener" from white. The amount the two spheres change color and size are controlled by the "musicPower" parameter as well. Each of the two spheres are seperately drawn with a distinct "Mesh" object in the Distributed App structure, respectively named "pattern0SphereL" and "pattern0SphereR". 
 
-- Pattern 1 (Express key [1]): a SINGULAR hollow cylinder made by particles that dances according spectrum of the FFT of the input audio. Specifically, from the bottom part to the top part of the particle cylinder, the particles are gradually colored from red to blue (fixed color), and dances according to the dB value from the lower frequencies to the higher frequencies on the STFT table. The position that each particle from the bottom to the top that locate themselves on the spectrum is non-linear, nor does the value of "musicForce" as higher frequencies have lower powers. How ardently the particles dance could also be controlled by the "musicPower" parameter. The sizes of the particles are also determined by the enveloped signal value of the music (average of left and right channel", just like how the background works. The cylinder is drawn by a SINGULAR Mesh called "pattern1ParticleCylinder".
+- Pattern 1 (Express key [1]): a SINGULAR hollow cylinder made by particles that dances according to the spectrum of the FFT of the input audio. Specifically, from the bottom part to the top part of the particle cylinder, the particles are gradually colored from red to blue (fixed color), and dances according to the dB value from the lower frequencies to the higher frequencies on the STFT table. The position that each particle from the bottom to the top that locate themselves on the spectrum is non-linear, nor does the value of "musicForce" as higher frequencies have lower powers. How ardently the particles dance could also be controlled by the "musicPower" parameter. The sizes of the particles are also determined by the enveloped signal value of the music (average of left and right channel", just like how the background works. The cylinder is drawn by a SINGULAR Mesh called "pattern1ParticleCylinder".
+
+- Pattern 2 (Express key [2]): a SINGULAR hollow sphere made by particles that dances according to the spectrum of the FFT of the input audio. Most parts of this pattern works similarly as pattern 1 except its shape and having more freedom for particles to move around.
 
 
 --------- Future patterns ---------
-- Pattern 2 (Express key [2]): two pans of particles that dances according to the FFT of the left and right channel signal *(hypothesized, to be continued...)*
+
 
 - Pattern 3 (Express key [3]): two spheres of particles that dances according to the FFT of the left and right channel signal *(hypothesized, to be continued...)*
 
