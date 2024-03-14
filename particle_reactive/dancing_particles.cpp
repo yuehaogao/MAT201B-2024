@@ -1,5 +1,5 @@
 // Yuehao Gao | MAT201B
-// 2022-03-13 | Final Project
+// 2022-03-14 | Final Project
 // Audio-reactive 3D visualizer
 
 // GitHub: https://github.com/yuehaogao/MAT201B-2024_Yuehao_Gao
@@ -24,18 +24,15 @@
   MusicPower (range 0 - 6, acquiscent: 3): 
     how strong the music affects the visual patterns,
     you may understand this parameter as "music volume".
+    used for pattern {0, 1, 2, 3}.
 
   SpringConstant (range 0.05 - 2, acquiscent: 0.6): 
     how stiff the spring is, 
     used for pattern {1, 2, 3} for calculating according to the Hooke's Law.
 
-  Pattern1CylinderRadius (range 0.2 - 2, acquiscent: 1.2): 
-    the radius of the cylinder, 
-    used for pattern {1}.
-
-  Pattern2SphereRadius (range 0.2 - 2, acquiscent: 0.8): 
-    the radius of the sphere, 
-    used for pattern {2}.
+  Radius (range 0.2 - 2, acquiscent: 1): 
+    the radius of all the patterns, 
+    used for pattern {0, 1, 2, 3}.
 
   --- Visuals ---
   Background: 
@@ -126,14 +123,15 @@ struct CommonState {
   float pointSize;                         // The size of the particles
   float springConstant;                    // The spring constant for Hooke's Law
   float spectrum[FFT_SIZE / 2 + 100];      // The added number is arbitrarily decided
+  float radius;                            // The radius of the cylinder / single sphere / double sphere
 
   // Pattern 1 specific parameters
-  float pattern1CylinderRadius;            // The radius of the cylinder
+  //float pattern1CylinderRadius;            // The radius of the cylinder
   Vec3f pattern1RealTimePosition[5000];    // The updated (at this moment) position of each particle on the cylinder
   HSV pattern1FixedColors[5000];           // The fixed color (HSV) of each particle on the cylinder
   
   // Pattern 2 specific parameters
-  float pattern2SphereRadius;              // The radius of the singular enclosing sphere
+  //float pattern2SphereRadius;              // The radius of the singular enclosing sphere
   float pattern2RealTimePointSize[1200];   // The updated (at this moment) particle size on the sphere
   Vec3f pattern2RealTimePosition[1200];    // The updated (at this moment) position of each particle on the sphere
   HSV pattern2RealTimeColors[1200];        // The updated (at this moment) color of each particle on the sphere
@@ -164,8 +162,9 @@ struct MyApp : DistributedAppWithState<CommonState> {
   Parameter pattern{"visual_pattern", 1, 0, 3};     // This will be limited to int only
   Parameter musicPower{"/musicPower", "", 2.5, 0.0, 6.0};
   Parameter springConstant{"/springConstant", "", 0.6, 0.05, 2.0};
-  Parameter pattern1CylinderRadius{"/cylinderRadius", "", 1.2, 0.2, 2.0};
-  Parameter pattern2SphereRadius{"/sphereRadius", "", 0.8, 0.2, 2.0};
+  Parameter radius{"/radius", "", 1.0, 0.2, 2.0};
+  //Parameter pattern1CylinderRadius{"/cylinderRadius", "", 1.2, 0.2, 2.0};
+  //Parameter pattern2SphereRadius{"/sphereRadius", "", 0.8, 0.2, 2.0};
   // Parameter repellingConstant{"/repellingConstant", "", 0.0, 0.0, 0.01};
 
 
@@ -192,11 +191,13 @@ struct MyApp : DistributedAppWithState<CommonState> {
   Mesh pattern1ParticleCylinder;
   Vec3f pattern1Velocity[pattern1NumParticle];
   Vec3f pattern1Force[pattern1NumParticle];
+  float pattern1CylinderRadius;
 
   // * Pattern 2:
   Mesh pattern2ParticleSphere;
   Vec3f pattern2Velocity[pattern2NumParticle];
   Vec3f pattern2Force[pattern2NumParticle];
+  float pattern2SphereRadius;
 
   // * Pattern 3:
 
@@ -236,10 +237,10 @@ struct MyApp : DistributedAppWithState<CommonState> {
       state().musicPower = musicPower;
       gui.add(springConstant);
       state().springConstant = springConstant;
-      gui.add(pattern1CylinderRadius);
-      state().pattern1CylinderRadius = pattern1CylinderRadius;
-      gui.add(pattern2SphereRadius);
-      state().pattern2SphereRadius = pattern2SphereRadius;
+      gui.add(radius);
+      state().radius = radius;
+      //gui.add(pattern2SphereRadius);
+      //state().pattern2SphereRadius = pattern2SphereRadius;
 
     }
 
@@ -269,6 +270,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
     // * Pattern 1: create all the particles with their initial positions, colors, velocity, and forces
       
     // Here, "p1i" means the index of the particle, from 0 to the last one
+    pattern1CylinderRadius = radius * 1.2;
     int p1i = 0;
 
     for (int layerIndex = 0; layerIndex < pattern1CylinderHeight; layerIndex++) {
@@ -304,6 +306,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
     // Here, "p2i" means the index of the particle, from 0 to the last one
     // Initialize the position and color of each particle
+    pattern2SphereRadius = 0.8 * radius;
     for (int p2i = 0; p2i < pattern2NumParticle; p2i++) {
 
       // Place the particle's position (initialized with random position)
@@ -406,7 +409,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       case 0:
         g.pushMatrix();
         g.translate(-1.0, 0, -5.0);
-        g.scale(sphereSize * state().valueL * state().musicPower * 1.5);
+        g.scale(sphereSize * radius * state().valueL * state().musicPower * 1.5);
         //g.lighting(true);
         g.color(RGB(1.0, 1.0 - pow(redColorChange, 2.0), 1.0 - pow(redColorChange, 2.0)));
         g.draw(pattern0SphereL);
@@ -414,7 +417,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
         g.pushMatrix();
         g.translate(1.0, 0, -5.0);
-        g.scale(sphereSize * state().valueR * state().musicPower * 1.5);
+        g.scale(sphereSize * radius * state().valueR * state().musicPower * 1.5);
         //g.lighting(true);
         g.color(RGB(1.0 - pow(greenColorChange, 2.0), 1.0, 1.0 - pow(greenColorChange, 2.0)));
         g.draw(pattern0SphereR);
@@ -465,6 +468,11 @@ struct MyApp : DistributedAppWithState<CommonState> {
       int flooredPatternIndex = (int) (std::floor(pattern));
       pattern = flooredPatternIndex;
       state().pattern = pattern;
+
+      // Unify the radius
+      pattern1CylinderRadius = 1.2 * radius;
+      pattern2SphereRadius = 0.8 * radius;
+
       
       // Pattern 1: --------------------------------------------------------------------------
       // Deal with all the particle forces
@@ -487,8 +495,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
         //int positionInSpectrum = (int) (FFT_SIZE * 0.5 * ((pattern1PositionVec[i].y + pattern1CylinderHalfLength) / (2 * pattern1CylinderHalfLength))) - 0.5 * FFT_SIZE;
 
         float musicForce = state().spectrum[positionInSpectrum];
-        float indexForceBoostLimit = 3.0;
-        float fftForce = ((pow(i, 1.5)) / 300000.0) * musicForce;
+        float indexForceBoostLimit = 5.0;
+        float fftForce = ((pow(i, 1.5)) / 100000.0) * musicForce;
         if (fftForce > indexForceBoostLimit ) {
           fftForce = indexForceBoostLimit;
         }
@@ -575,6 +583,9 @@ struct MyApp : DistributedAppWithState<CommonState> {
         state().pattern2RealTimeColors[i] = HSV(newHue, 1.0, 1.0);
         pattern2ParticleSphere.color(HSV(newHue, 1.0, 1.0));
 
+
+        //pattern2ParticleSphere.texCoord()[i].x = 10;
+
       }
 
 
@@ -590,8 +601,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       state().pointSize = pointSize;
       state().musicPower = musicPower;
       state().springConstant = springConstant;
-      state().pattern1CylinderRadius = pattern1CylinderRadius;
-      state().pattern2SphereRadius = pattern2SphereRadius;
+      state().radius = radius;
 
 
       // Tell the distributed app about the refresh of every particle
