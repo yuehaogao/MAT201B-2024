@@ -3,7 +3,7 @@
 
 ## MAT201B, Professor Karl Yerkes, March 2024
 
-This is the repository of my project implementing a 3D visualizer for input music files. The project brings 2 (future: 4) distinct visual patterns that moves along the input audio signal. There is a controllable sliding parameter named "pattern" that allows changing the visual parameter from one to another. You may also use express keys (number keys: [0], [1] (future: [2], [3])) to change visual patterns.
+This is the repository of my project implementing a 3D visualizer for input music files. The project brings 2 (future: 4) distinct visual patterns that moves along the input audio signal. There is a controllable sliding parameter named "pattern" that allows changing the visual parameter from one to another. You may also use express keys (number keys: [0], [1], [2] (future: [3])) to change visual patterns. You may also press on [p] to locate yourself at (0, 0, 5) outside the mesh.
 
 The current version allows switching between the 3 input pieces with the [u], [i], [o], [k], [l] express key. In the future, it will allow a dropdown list to choose between multiple input music files.
 
