@@ -14,7 +14,7 @@
   --- Express Shortcut Keys ---
   [0], [1], [2]: changing visual patterns
   [u], [i], [o], [k], [l]: switch between music files
-  [p]: back to the center position (0.0, 0.0, 0.0)
+  [p]: proceed to the position (0.0, 0.0, 5.0)
 
   --- Controllable Parameters ---
   VisualPattern (range 0 - 3, acquiscent: 1): 
@@ -29,9 +29,13 @@
     how stiff the spring is, 
     used for pattern {1, 2, 3} for calculating according to the Hooke's Law.
 
-  Pattern1CylinderRadius (range 0.2 - 2, acquiscent: 0.75): 
+  Pattern1CylinderRadius (range 0.2 - 2, acquiscent: 1.2): 
     the radius of the cylinder, 
     used for pattern {1}.
+
+  Pattern2SphereRadius (range 0.2 - 2, acquiscent: 0.8): 
+    the radius of the sphere, 
+    used for pattern {2}.
 
   --- Visuals ---
   Background: 
@@ -62,7 +66,7 @@
 
 
 // ---- TO DO -----
-// implement pattern 2
+// implement pattern 2: specifically, grab music force from the max in a range. mind edges
 // implement pattern 3
 // express p: rotate to original as well
 // how to enable different point size in the same mesh?
@@ -103,7 +107,7 @@ const int pattern1NumParticle = pattern1CylinderHeight * pattern1CylinderNumPart
 const float pattern1AngleIncrement = 2.0 * M_PI / pattern1CylinderNumParticlePerlayer;
 const float pattern1CylinderHalfLength = 0.6;
 
-const int pattern2NumParticle = 1750;
+const int pattern2NumParticle = 1000;
 
 int frameCount = 0;  // used for debugging only
 
@@ -130,8 +134,8 @@ struct CommonState {
   
   // Pattern 2 specific parameters
   float pattern2SphereRadius;              // The radius of the singular enclosing sphere
-  Vec3f pattern2RealTimePosition[4000];    // The updated (at this moment) position of each particle on the sphere
-  HSV pattern2RealTimeColors[4000];        // The updated (at this moment) color of each particle on the sphere
+  Vec3f pattern2RealTimePosition[1200];    // The updated (at this moment) position of each particle on the sphere
+  HSV pattern2RealTimeColors[1200];        // The updated (at this moment) color of each particle on the sphere
 
   // Pattern 3 specific parameters
   
@@ -160,7 +164,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
   Parameter musicPower{"/musicPower", "", 2.5, 0.0, 6.0};
   Parameter springConstant{"/springConstant", "", 0.6, 0.05, 2.0};
   Parameter pattern1CylinderRadius{"/cylinderRadius", "", 1.2, 0.2, 2.0};
-  Parameter pattern2SphereRadius{"/sphereRadius", "", 0.6, 0.25, 2.0};
+  Parameter pattern2SphereRadius{"/sphereRadius", "", 0.8, 0.2, 2.0};
   // Parameter repellingConstant{"/repellingConstant", "", 0.0, 0.0, 0.01};
 
 
@@ -340,7 +344,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       followRight.lag(0.5);
   
       // Initialize the position of "camera"
-      nav().pos(0, 0, 0.0);
+      nav().pos(0.0, 0.0, 0.0);
     }
     
   }
@@ -368,15 +372,11 @@ struct MyApp : DistributedAppWithState<CommonState> {
       // STFT
       if (stft(io.out(0))) { 
         // Loop through all the frequency bins
-        int kk = 0;
         for (unsigned k = 0; k < stft.numBins(); ++k) {
           state().spectrum[k] = 8.0 * tanh(pow(stft.bin(k).real(), 1.5));
-          kk++;
         }
-       //cout << "k max: " << kk << endl;
       }
 
-      
 
       // https://github.com/adamstark/Gist
     }
@@ -519,81 +519,69 @@ struct MyApp : DistributedAppWithState<CommonState> {
         // According to their original positions and current positions
         Vec3f particleToCenter = Vec3f(0.0, 0.0, 0.0) - pattern2PositionVec[i];
         float distanceToSurface = particleToCenter.mag() - pattern2SphereRadius;
-        Vec3f inNOutspringForce = particleToCenter.normalize() * springConstant * distanceToSurface;
+        Vec3f inNOutspringForce = particleToCenter.normalize() * (springConstant) * distanceToSurface;
         pattern2Force[i] += inNOutspringForce;
 
+        // For every other particle in the mesh system
+        // Calculating the repelling force excerted within each other
         for (int j = i + 1; j < pattern2NumParticle; j++) {
-          // For every other particle in the mesh system
-          // Calculating the repelling force excerted within each other
           Vec3f displacement = pattern2PositionVec[j] - pattern2PositionVec[i];
           float distanceSquared = displacement.magSqr();
-          Vec3f repellingForce = displacement.normalize() * (0.00012 / distanceSquared);
+          Vec3f repellingForce = displacement.normalize() * (0.00025 / distanceSquared);
           pattern2Force[i] -= repellingForce;
           pattern2Force[j] += repellingForce;
-
         }
 
         pattern2Force[i] -= pattern2Velocity[i] * dragFactor;
         
         // Important: add the force excerted by audio
-        float particleY = (pattern2PositionVec[i].y + pattern2SphereRadius) * 10.0 / (2.0 * pattern2SphereRadius);
-        int PositionInSpectrum = 2 + std::floor(pow(particleY, 4.0) / 20);
-
-        
-        //cout << "i: " << i << ", particley: " << particleY << endl;
-
-
-        if (PositionInSpectrum > 2124) {
-          PositionInSpectrum = 2124;
-          //cout << "Error: pos is at " << PositionInSpectrum << endl;
+        // "particleHeightIndex" is a float number that is SUPPOSED to range from 0 to 10
+        // which indicates the relavant "height" the particle is in the entire sphere
+        // if the particle exceeds the sphere range, the number will be limited
+        float particleHeightIndex = (pattern2PositionVec[i].y + pattern2SphereRadius) * 10.0 / (2.0 * pattern2SphereRadius);
+        if (particleHeightIndex < 0.0) {
+          particleHeightIndex = 0.0;
+        }
+        if (particleHeightIndex > 10.0) {
+          particleHeightIndex = 10.0;
         }
 
+        int PositionInSpectrum = 2 + std::floor(pow(particleHeightIndex, 4.0) / 9);  // maybe make the devided number a sliding parameter?
         float MusicForce = state().spectrum[PositionInSpectrum];
-        float fftForce = ((pow(100 * particleY, 1.5))) * MusicForce;
-        float indexForceBoostLimit = 5.0;
+        float fftForce = MusicForce * 0.1;
+
+        
+
+
+        float indexForceBoostLimit = 0.2;
         if (fftForce > indexForceBoostLimit) {
           fftForce = indexForceBoostLimit;
         }
-        
-        // float minFFTValue = 0.0;
-        // float maxFFTValue = 0.0;
 
-        //cout << state().spectrum.size() << endl;
-
-        // if (frameCount == 100) {
-        //   cout << "got here" << endl;
-        //   for (int q = 0; q < FFT_SIZE / 2; q++) {
-        //     if (state().spectrum[q] < ) {
-
-        //     }
-        //     cout << q << " | " << state().spectrum[q] << endl;
-        //   }
-        //   break;
-        // }
-
-        // if (frameCount < 3) {
-        //   cout << MusicForce << endl;
-        // }
-        
-
-        float p2BassBoost = 4.0 - 3.0 * ((10 - particleY) / 10);
- 
-        // Remove the *0.0001 later!
-        //cout << pattern2ParticleSphere.vertices().size() << endl;
-
-        if (frameCount < 11) {
-          //cout << i << " | " << pattern2PositionVec[i].x << ", " << pattern2PositionVec[i].y << ", " << pattern2PositionVec[i].z << " | " << fftForce << endl;
+        if (frameCount > 20 && frameCount < 23) {
+          cout << particleHeightIndex << " | " << fftForce << endl;
         }
-        //pattern2Force[i] -= Vec3f(pattern2PositionVec[i].x, pattern2PositionVec[i].y, pattern2PositionVec[i].z); // * fftForce * state().musicPower * p2BassBoost;
+    
+        float p2BassBoost = 3.5 - 1.5 * ((10 - particleHeightIndex) / 10);
+ 
+        pattern2Force[i] += Vec3f(pattern2PositionVec[i].x, pattern2PositionVec[i].y, pattern2PositionVec[i].z) * fftForce * p2BassBoost * state().musicPower;
+
 
         pattern2Velocity[i] += pattern2Force[i] / particleMass * timeStep;
         pattern2PositionVec[i] += pattern2Velocity[i] * timeStep;
         state().pattern2RealTimePosition[i] = pattern2PositionVec[i];
 
-        
 
         // Meanwhile, change its color according to its new position
-        float newHue = 0.7 * ((state().pattern2RealTimePosition[i].y + pattern2SphereRadius) / (2.0 * pattern2SphereRadius));
+        float yIndexForColor = state().pattern2RealTimePosition[i].y + pattern2SphereRadius;
+        if (yIndexForColor < 0.0) {
+          yIndexForColor = 0.0;
+        }
+        if (yIndexForColor > 2.0 * pattern2SphereRadius) {
+          yIndexForColor = 2.0 * pattern2SphereRadius;
+        }
+
+        float newHue = 0.7 * (yIndexForColor / (2.0 * pattern2SphereRadius));
         state().pattern2RealTimeColors[i] = HSV(newHue, 1.0, 1.0);
         pattern2ParticleSphere.color(HSV(newHue, 1.0, 1.0));
 
@@ -687,7 +675,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       player.load("../it.mp3");
     }
     if (k.key() == 'p') {
-      nav().pos(0.0, 0.0, 0.0);
+      nav().pos(0.0, 0.0, 5.0);
       // QUESTION: HOW TO MAKE THE ROTATION STRAIGHT?
     }
 
