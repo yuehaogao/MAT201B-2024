@@ -704,7 +704,12 @@ string slurp(string fileName) {
 
 int main() {
   MyApp app;
-  app.configureAudio(48000, 512, 2, 2);
+  if (al::Socket::hostName() == "ar01.1g") {
+    AudioDevice device = AudioDevice("ECHO X5");
+    app.configureAudio(device, 44100, 128, device.channelsOutMax(), 2);
+  } else {
+    app.configureAudio(48000, 512, 2, 2);
+  }
   app.start();
 }
 
