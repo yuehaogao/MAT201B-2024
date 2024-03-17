@@ -1,5 +1,5 @@
 // Yuehao Gao | MAT201B
-// 2022-03-14 | Final Project
+// 2022-03-16 | Final Project
 // Audio-reactive 3D visualizer
 
 // GitHub: https://github.com/yuehaogao/MAT201B-2024_Yuehao_Gao
@@ -96,17 +96,21 @@ using namespace std;
 const float dragFactor = 0.15;
 const float particleMass = 3.0;
 const float sphereSize = 0.8;
-const float timeStep = 1.0;
 
 const int pattern1CylinderHeight = 40;
 const int pattern1CylinderNumParticlePerlayer = 112;
 const int pattern1NumParticle = pattern1CylinderHeight * pattern1CylinderNumParticlePerlayer;
 const float pattern1AngleIncrement = 2.0 * M_PI / pattern1CylinderNumParticlePerlayer;
-const float pattern1CylinderHalfLength = 0.6;
+const float pattern1CylinderHalfLength = 1.0;
+const float pattern1RadiusIncrement = 1.2;
 
 const int pattern2NumParticle = 1000;
+const float pattern2RadiusIncrement = 1.1;
 
-int frameCount = 0;  // used for debugging only
+const int pattern3NumParticle = 300;    // This is the amount of particle for EACH mesh
+const float pattern3RadiusIncrement = 0.5;
+
+int frameCount = 0;                     // Mainly used for debugging
 
 
 // -----------------------------------------------------------------------------
@@ -115,28 +119,36 @@ int frameCount = 0;  // used for debugging only
 // Information shared with the "Distributed App"
 struct CommonState {
   // Public parameters for all patterns
-  int pattern;                             // The visual pattern, either being 0, 1, 2, or 3
   Pose pose;                               // The position and angel of the "camera"
+  int pattern;                             // The visual pattern, either being 0, 1, 2, or 3
   float valueL;                            // Envelopsed right channel value
   float valueR;                            // Enveloped left channel value
   float musicPower;                        // The "volume" of music: how much the music affect visual patterns
   float pointSize;                         // The size of the particles
+  float timeStep;                          // How fast the particles proceed
   float springConstant;                    // The spring constant for Hooke's Law
-  float spectrum[FFT_SIZE / 2 + 100];      // The added number is arbitrarily decided
+  float spectrum[FFT_SIZE / 2 + 100];      // The added number is arbitrarily decided (The spectrum for both channels)
+  float spectrumL[FFT_SIZE / 2 + 100];     // The spectrum for the left channel only
+  float spectrumR[FFT_SIZE / 2 + 100];     // The spectrum for the right channel only
   float radius;                            // The radius of the cylinder / single sphere / double sphere
+  float distance;                          // The distance between the mesh for left and right channel
 
   // Pattern 1 specific parameters
-  //float pattern1CylinderRadius;            // The radius of the cylinder
   Vec3f pattern1RealTimePosition[5000];    // The updated (at this moment) position of each particle on the cylinder
   HSV pattern1FixedColors[5000];           // The fixed color (HSV) of each particle on the cylinder
   
   // Pattern 2 specific parameters
-  //float pattern2SphereRadius;              // The radius of the singular enclosing sphere
-  float pattern2RealTimePointSize[1200];   // The updated (at this moment) particle size on the sphere
-  Vec3f pattern2RealTimePosition[1200];    // The updated (at this moment) position of each particle on the sphere
-  HSV pattern2RealTimeColors[1200];        // The updated (at this moment) color of each particle on the sphere
+  float pattern2RealTimePointSize[1050];   // The updated (at this moment) particle size on the sphere
+  Vec3f pattern2RealTimePosition[1050];    // The updated (at this moment) position of each particle on the sphere
+  HSV pattern2RealTimeColors[1050];        // The updated (at this moment) color of each particle on the sphere
 
   // Pattern 3 specific parameters
+  float pattern3LRealTimePointSize[350];
+  float pattern3RRealTimePointSize[350];
+  Vec3f pattern3LRealTimePosition[350];
+  Vec3f pattern3RRealTimePosition[350];
+  HSV pattern3LRealTimeColors[350];
+  HSV pattern3RRealTimeColors[350];
   
 };
 
@@ -146,6 +158,9 @@ Vec3f randomVec3f(float scale) {
   return Vec3f(rnd::uniformS(), rnd::uniformS(), rnd::uniformS()) * scale;
 }
 
+Vec3f randomVec3fWithCenter(float scale, float x, float y, float z) {
+  return Vec3f(rnd::uniformS() * scale + x, rnd::uniformS() * scale+ y, rnd::uniformS() * scale + z);
+}
 
 // To slurp a file (initialized)
 string slurp(string fileName);  // forward declaration
@@ -159,18 +174,19 @@ struct MyApp : DistributedAppWithState<CommonState> {
   Parameter valueL{"value_left", 0, 0, 1};
   Parameter valueR{"value_right", 0, 0, 1};
   Parameter pointSize{"/pointSize", "", 0.5, 0.1, 1.5};
-  Parameter pattern{"visual_pattern", 1, 0, 3};     // This will be limited to int only
+  Parameter pattern{"visual_pattern", 1.0, 0.0, 3.9};      // This will be limited to int only
   Parameter musicPower{"/musicPower", "", 2.5, 0.0, 6.0};
+  Parameter timeStep{"/timeStep", "", 1.0, 0.25, 2.0};
   Parameter springConstant{"/springConstant", "", 0.6, 0.05, 2.0};
   Parameter radius{"/radius", "", 1.0, 0.2, 2.0};
-  //Parameter pattern1CylinderRadius{"/cylinderRadius", "", 1.2, 0.2, 2.0};
-  //Parameter pattern2SphereRadius{"/sphereRadius", "", 0.8, 0.2, 2.0};
-  // Parameter repellingConstant{"/repellingConstant", "", 0.0, 0.0, 0.01};
+  Parameter distance{"/distance", "", 2.0, 0.5, 4.0};
 
 
   // STFT variables
   // Format of frequency samples: COMPLEX, MAG_PHASE, or MAG_FREQ
   gam::STFT stft = gam::STFT(FFT_SIZE, FFT_SIZE / 4, 0, gam::HANN, gam::MAG_FREQ);
+
+
   // --------------------------------------------
 
   // The sample player for 1 sound track only
@@ -200,6 +216,14 @@ struct MyApp : DistributedAppWithState<CommonState> {
   float pattern2SphereRadius;
 
   // * Pattern 3:
+  Mesh pattern3LParticleSphere;
+  Vec3f pattern3LVelocity[pattern3NumParticle];
+  Vec3f pattern3LForce[pattern3NumParticle];
+  Mesh pattern3RParticleSphere;
+  Vec3f pattern3RVelocity[pattern3NumParticle];
+  Vec3f pattern3RForce[pattern3NumParticle];
+  float pattern3SphereRadius;
+
 
   // ------------------------------------
 
@@ -220,7 +244,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
     if (isPrimary()) {
       // Load the sound file
-      player.load("../dc.mp3");
+      player.load("../wav_files/Dancin.wav");
     
       // set up GUI
       auto GUIdomain = GUIDomain::enableGUI(defaultWindowDomain());
@@ -235,15 +259,16 @@ struct MyApp : DistributedAppWithState<CommonState> {
       state().pattern = pattern;
       gui.add(musicPower);
       state().musicPower = musicPower;
+      gui.add(timeStep);
+      state().timeStep = timeStep;
       gui.add(springConstant);
       state().springConstant = springConstant;
       gui.add(radius);
       state().radius = radius;
-      //gui.add(pattern2SphereRadius);
-      //state().pattern2SphereRadius = pattern2SphereRadius;
+      gui.add(distance);
+      state().distance = distance;
 
     }
-
   }
 
 
@@ -270,7 +295,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
     // * Pattern 1: create all the particles with their initial positions, colors, velocity, and forces
       
     // Here, "p1i" means the index of the particle, from 0 to the last one
-    pattern1CylinderRadius = radius * 1.2;
+    pattern1CylinderRadius = radius * pattern1RadiusIncrement;
     int p1i = 0;
 
     for (int layerIndex = 0; layerIndex < pattern1CylinderHeight; layerIndex++) {
@@ -306,7 +331,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
     // Here, "p2i" means the index of the particle, from 0 to the last one
     // Initialize the position and color of each particle
-    pattern2SphereRadius = 0.8 * radius;
+    pattern2SphereRadius = radius * pattern2RadiusIncrement;
     for (int p2i = 0; p2i < pattern2NumParticle; p2i++) {
 
       // Place the particle's position (initialized with random position)
@@ -327,9 +352,49 @@ struct MyApp : DistributedAppWithState<CommonState> {
     }
 
 
-    // Pattern 3: ...
+    // Pattern 3:
+    pattern3SphereRadius = radius * pattern3RadiusIncrement;
 
-    //cout << "Invalid Value Initialized: " << nanInitialized << endl;
+
+    for (int p3li = 0; p3li < pattern3NumParticle; p3li++) {
+
+      // Place the particle's position (initialized with random position)
+      Vec3f randomInitPositionOfThisParticle = randomVec3fWithCenter(pattern3SphereRadius, distance * -0.5, 0.0, -2.0);
+      pattern3LParticleSphere.vertex(randomInitPositionOfThisParticle);
+      state().pattern3LRealTimePosition[p3li] = randomInitPositionOfThisParticle;
+
+      // Color the particle
+      float p3hue = 0.7 * ((randomInitPositionOfThisParticle.y + pattern3SphereRadius) / (2.0 * pattern3SphereRadius));
+      pattern3LParticleSphere.color(HSV(p3hue, 1.0f, 1.0f));
+      state().pattern3LRealTimeColors[p3li] = HSV(p3hue, 1.0f, 1.0f);
+
+      // Set the particle's physical force system
+      pattern3LParticleSphere.texCoord(pow(particleMass, 1.0f / 3), 0);
+      pattern3LVelocity[p3li] = Vec3f(0.0, 0.0, 0.0);
+      pattern3LForce[p3li] = Vec3f(0.0, 0.0, 0.0);
+
+    }
+
+    for (int p3ri = 0; p3ri < pattern3NumParticle; p3ri++) {
+
+      // Place the particle's position (initialized with random position)
+      Vec3f randomInitPositionOfThisParticle = randomVec3fWithCenter(pattern3SphereRadius, distance * 0.5, 0.0, -2.0);
+      pattern3RParticleSphere.vertex(randomInitPositionOfThisParticle);
+      state().pattern3RRealTimePosition[p3ri] = randomInitPositionOfThisParticle;
+
+      // Color the particle
+      float p3hue = 0.7 * ((randomInitPositionOfThisParticle.y + pattern3SphereRadius) / (2.0 * pattern3SphereRadius));
+      pattern3RParticleSphere.color(HSV(p3hue, 1.0f, 1.0f));
+      state().pattern3RRealTimeColors[p3ri] = HSV(p3hue, 1.0f, 1.0f);
+
+      // Set the particle's physical force system
+      pattern3RParticleSphere.texCoord(pow(particleMass, 1.0f / 3), 0);
+      pattern3RVelocity[p3ri] = Vec3f(0.0, 0.0, 0.0);
+      pattern3RForce[p3ri] = Vec3f(0.0, 0.0, 0.0);
+
+    }
+
+
     
     // ----------- Initialize Parameters for All Meshes Ends -------------
 
@@ -340,6 +405,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
     addSphere(pattern0SphereR);
     pattern1ParticleCylinder.primitive(Mesh::POINTS);
     pattern2ParticleSphere.primitive(Mesh::POINTS);
+    pattern3LParticleSphere.primitive(Mesh::POINTS);
+    pattern3RParticleSphere.primitive(Mesh::POINTS);
 
     // LOCAL-ONLY initialization process
     if (isPrimary()) {
@@ -366,21 +433,34 @@ struct MyApp : DistributedAppWithState<CommonState> {
       float sRight = player.read(0);
       float sLeft = player.read(1);
       
-
       io.out(0) = sLeft;
       io.out(1) = sRight;
 
       valueL = (followLeft(sLeft));
       valueR = (followRight(sRight));
 
+
+
       // STFT
+      // Spectrum for right channel
       if (stft(io.out(0))) { 
         // Loop through all the frequency bins
         for (unsigned k = 0; k < stft.numBins(); ++k) {
           state().spectrum[k] = 8.0 * tanh(pow(stft.bin(k).real(), 1.5));
+          state().spectrumR[k] = 8.0 * tanh(pow(stft.bin(k).real(), 1.5));
         }
       }
 
+      // Spectrum for left channel
+      if (stft(io.out(1))) { 
+        // Loop through all the frequency bins
+        for (unsigned k = 0; k < stft.numBins(); ++k) {
+          state().spectrum[k] = 8.0 * tanh(pow(stft.bin(k).real(), 1.5));
+          state().spectrumL[k] = 8.0 * tanh(pow(stft.bin(k).real(), 1.5));
+        }
+      }
+
+    
       // https://github.com/adamstark/Gist
     }
   }
@@ -408,7 +488,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
     switch((int)(state().pattern)) {
       case 0:
         g.pushMatrix();
-        g.translate(-1.0, 0, -5.0);
+        g.translate(-0.5 * distance, 0, -2.0);
         g.scale(sphereSize * radius * state().valueL * state().musicPower * 1.5);
         //g.lighting(true);
         g.color(RGB(1.0, 1.0 - pow(redColorChange, 2.0), 1.0 - pow(redColorChange, 2.0)));
@@ -416,7 +496,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
         g.popMatrix();
 
         g.pushMatrix();
-        g.translate(1.0, 0, -5.0);
+        g.translate(0.5 * distance, 0, -2.0);
         g.scale(sphereSize * radius * state().valueR * state().musicPower * 1.5);
         //g.lighting(true);
         g.color(RGB(1.0 - pow(greenColorChange, 2.0), 1.0, 1.0 - pow(greenColorChange, 2.0)));
@@ -445,6 +525,16 @@ struct MyApp : DistributedAppWithState<CommonState> {
         break;
 
       case 3:
+        //g.pushMatrix();
+        g.shader(pointShader);
+        g.shader().uniform("pointSize", state().pointSize / 100);
+        g.blending(true);
+        //g.lighting(true);
+        g.blendTrans();
+        g.depthTesting(true);
+        g.draw(pattern3LParticleSphere);
+        g.draw(pattern3RParticleSphere);
+
         break;
     }
 
@@ -470,8 +560,9 @@ struct MyApp : DistributedAppWithState<CommonState> {
       state().pattern = pattern;
 
       // Unify the radius
-      pattern1CylinderRadius = 1.2 * radius;
-      pattern2SphereRadius = 0.8 * radius;
+      pattern1CylinderRadius = pattern1RadiusIncrement * radius;
+      pattern2SphereRadius = pattern2RadiusIncrement * radius;
+      pattern3SphereRadius = pattern3RadiusIncrement * radius;
 
       
       // Pattern 1: --------------------------------------------------------------------------
@@ -566,7 +657,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
         float tweetBoost = 1.5 + 8.5 * (particleHeightIndex / 10);
         pattern2Force[i] += Vec3f(pattern2PositionVec[i].x, pattern2PositionVec[i].y, pattern2PositionVec[i].z) * fftForce * tweetBoost * state().musicPower;
 
-        pattern2Velocity[i] += pattern2Force[i] / particleMass * (timeStep * 0.5);
+        pattern2Velocity[i] += pattern2Force[i] / particleMass * (timeStep * 0.66);
         pattern2PositionVec[i] += pattern2Velocity[i] * timeStep;
         state().pattern2RealTimePosition[i] = pattern2PositionVec[i];
 
@@ -584,7 +675,81 @@ struct MyApp : DistributedAppWithState<CommonState> {
         pattern2ParticleSphere.color(HSV(newHue, 1.0, 1.0));
 
 
-        //pattern2ParticleSphere.texCoord()[i].x = 10;
+      }
+
+      // Pattern 3L&R: --------------------------------------------------------------------------
+      // Deal with all the particle forces
+      vector<Vec3f> &pattern3LPositionVec(pattern3LParticleSphere.vertices());
+
+      // First clear the sphere particles' color
+      // They will be updated in real-time on every frame
+      pattern3LParticleSphere.colors().clear();
+      
+
+      for (int i = 0; i < pattern3NumParticle; i++) {
+        // Add spring force to particles
+        // According to their original positions and current positions
+        Vec3f particleToCenter = Vec3f(-0.5 * distance, 0.0, -2.0) - pattern3LPositionVec[i];
+        //Vec3f particleToCenter = Vec3f(0.0, 0.0, 0.0) - pattern3LPositionVec[i];
+        float distanceToSurface = particleToCenter.mag() - pattern3SphereRadius;
+        Vec3f inNOutspringForce = particleToCenter.normalize() * (springConstant) * distanceToSurface;
+        pattern3LForce[i] += inNOutspringForce * 0.75;
+
+        // For every other particle in the mesh system
+        // Calculating the repelling force excerted within each other
+        for (int j = i + 1; j < pattern3NumParticle; j++) {
+          Vec3f displacement = pattern3LPositionVec[j] - pattern3LPositionVec[i];
+          float distanceSquared = displacement.magSqr();
+          Vec3f repellingForce = displacement.normalize() * (0.0002 / distanceSquared);
+          pattern3LForce[i] -= repellingForce;
+          pattern3LForce[j] += repellingForce;
+        }
+
+        pattern3LForce[i] -= pattern3LVelocity[i] * dragFactor;
+        
+        // Important: add the force excerted by audio
+        // "particleHeightIndex" is a float number that is SUPPOSED to range from 0 to 10
+        // which indicates the relavant "height" the particle is in the entire sphere
+        // if the particle exceeds the sphere range, the number will be limited
+        float particleHeightIndex = (pattern3LPositionVec[i].y + pattern3SphereRadius) * 10.0 / (2.0 * pattern3SphereRadius);
+        if (particleHeightIndex < 0.0) {
+          particleHeightIndex = 0.0;
+        }
+        if (particleHeightIndex > 10.0) {
+          particleHeightIndex = 10.0;
+        }
+
+        int positionInSpectrum = 4 + std::floor(pow(particleHeightIndex, 4.0) / 10);  // maybe make the devided number a sliding parameter?
+        float musicForce = state().spectrumL[positionInSpectrum];
+        float fftForce = musicForce * 0.2;
+    
+        float indexForceBoostLimit = 0.01;
+        if (fftForce > indexForceBoostLimit) {
+          fftForce = indexForceBoostLimit;
+        }
+
+        float tweetBoost = 1.5 + 8.5 * (particleHeightIndex / 10);
+
+        // CHANGE THIS
+        pattern3LForce[i] += Vec3f(pattern3LPositionVec[i].x + (0.5 * distance), pattern3LPositionVec[i].y, pattern3LPositionVec[i].z + 2.0) * fftForce * tweetBoost * state().musicPower;
+
+        pattern3LVelocity[i] += pattern3LForce[i] / particleMass * (timeStep * 0.66);
+        pattern3LPositionVec[i] += pattern3LVelocity[i] * timeStep;
+        state().pattern3LRealTimePosition[i] = pattern3LPositionVec[i];
+
+        // Meanwhile, change its color according to its new position
+        float yIndexForColor = state().pattern3LRealTimePosition[i].y + pattern3SphereRadius;
+        if (yIndexForColor < 0.0) {
+          yIndexForColor = 0.0;
+        }
+        if (yIndexForColor > 2.0 * pattern3SphereRadius) {
+          yIndexForColor = 2.0 * pattern3SphereRadius;
+        }
+
+        float newHue = 0.7 * (yIndexForColor / (2.0 * pattern3SphereRadius));
+        state().pattern3LRealTimeColors[i] = HSV(newHue, 1.0, 1.0);
+        pattern3LParticleSphere.color(HSV(newHue, 1.0, 1.0));
+
 
       }
 
@@ -594,14 +759,19 @@ struct MyApp : DistributedAppWithState<CommonState> {
       // Clear all forces for pattern 1, 2, 3
       for (auto &a : pattern1Force) a.set(0);
       for (auto &a : pattern2Force) a.set(0);
+      for (auto &a : pattern3LForce) a.set(0);
+      for (auto &a : pattern3RForce) a.set(0);
 
       // Unify other parameters between local and "state"
       state().valueL = valueL;
       state().valueR = valueR;
       state().pointSize = pointSize;
       state().musicPower = musicPower;
+      state().timeStep = timeStep;
       state().springConstant = springConstant;
       state().radius = radius;
+      state().distance = distance;
+
 
 
       // Tell the distributed app about the refresh of every particle
@@ -610,6 +780,10 @@ struct MyApp : DistributedAppWithState<CommonState> {
       }
       for (int i = 0; i < pattern2NumParticle; i++) {
         state().pattern2RealTimePosition[i] = pattern2PositionVec[i];    
+      }
+      for (int i = 0; i < pattern3NumParticle; i++) {
+        state().pattern3LRealTimePosition[i] = pattern3LPositionVec[i]; 
+        //state().pattern3RRealTimePosition[i] = pattern3RPositionVec[i];   
       }
    
     } else {
@@ -631,6 +805,18 @@ struct MyApp : DistributedAppWithState<CommonState> {
         // Update each particle's position and color
         pattern2ParticleSphere.vertex(state().pattern2RealTimePosition[i]);
         pattern2ParticleSphere.color(state().pattern2RealTimeColors[i]);
+      }
+
+      pattern3LParticleSphere.vertices().clear();
+      pattern3LParticleSphere.colors().clear();
+      pattern3RParticleSphere.vertices().clear();
+      pattern3RParticleSphere.colors().clear();
+      for (int i = 0; i < pattern3NumParticle; i++) {
+        // Update each particle's position and color
+        pattern3LParticleSphere.vertex(state().pattern3LRealTimePosition[i]);
+        pattern3LParticleSphere.color(state().pattern3LRealTimeColors[i]);
+        pattern3RParticleSphere.vertex(state().pattern3RRealTimePosition[i]);
+        pattern3RParticleSphere.color(state().pattern3RRealTimeColors[i]);
       }
 
     }
@@ -681,6 +867,21 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
     return true; 
   }
+
+  // onExit
+  // Clear all meshes by removing all vertices and colors
+  //
+  void onExit() override {
+    pattern1ParticleCylinder.vertices().clear();
+    pattern2ParticleSphere.vertices().clear();
+    pattern3LParticleSphere.vertices().clear();
+    pattern3RParticleSphere.vertices().clear();
+
+    pattern1ParticleCylinder.colors().clear();
+    pattern2ParticleSphere.colors().clear();
+    pattern3LParticleSphere.colors().clear();
+    pattern3RParticleSphere.colors().clear();
+  }
   
 };
 
@@ -703,6 +904,10 @@ string slurp(string fileName) {
 // -----------------------------------------------------------------------------
 
 int main() {
+  // MyApp app;
+  // app.configureAudio(48000, 512, 2, 2);
+  // app.start();
+
   MyApp app;
   if (al::Socket::hostName() == "ar01.1g") {
     AudioDevice device = AudioDevice("ECHO X5");
@@ -710,7 +915,8 @@ int main() {
   } else {
     app.configureAudio(48000, 512, 2, 2);
   }
-  app.start();
+  app.start();  
 }
+
 
 
