@@ -1,5 +1,5 @@
 // Yuehao Gao | MAT201B
-// 2022-03-16 | Final Project
+// 2022-03-17 | Final Project
 // Audio-reactive 3D visualizer
 
 // GitHub: https://github.com/yuehaogao/MAT201B-2024_Yuehao_Gao
@@ -63,10 +63,9 @@
 
 
 // ---- TO DO -----
-// implement pattern 2: specifically, grab music force from the max in a range. mind edges
-// implement pattern 3
+// FIX: spectrum L R issue
+// enable auto-changing pattern
 // express p: rotate to original as well
-// how to enable different point size in the same mesh?
 // make the music selection system by "dropdown list" instead of triple express keys
 
 
@@ -680,12 +679,15 @@ struct MyApp : DistributedAppWithState<CommonState> {
       // Pattern 3L&R: --------------------------------------------------------------------------
       // Deal with all the particle forces
       vector<Vec3f> &pattern3LPositionVec(pattern3LParticleSphere.vertices());
+      vector<Vec3f> &pattern3RPositionVec(pattern3RParticleSphere.vertices());
 
       // First clear the sphere particles' color
       // They will be updated in real-time on every frame
       pattern3LParticleSphere.colors().clear();
-      
+      pattern3RParticleSphere.colors().clear();
 
+
+      // Deal with each particle in the left mesh
       for (int i = 0; i < pattern3NumParticle; i++) {
         // Add spring force to particles
         // According to their original positions and current positions
@@ -749,6 +751,72 @@ struct MyApp : DistributedAppWithState<CommonState> {
         float newHue = 0.7 * (yIndexForColor / (2.0 * pattern3SphereRadius));
         state().pattern3LRealTimeColors[i] = HSV(newHue, 1.0, 1.0);
         pattern3LParticleSphere.color(HSV(newHue, 1.0, 1.0));
+
+      }
+
+      
+      // Deal with each particle in the right mesh
+      for (int i = 0; i < pattern3NumParticle; i++) {
+        // Add spring force to particles
+        // According to their original positions and current positions
+        Vec3f particleToCenter = Vec3f(0.5 * distance, 0.0, -2.0) - pattern3RPositionVec[i];
+        float distanceToSurface = particleToCenter.mag() - pattern3SphereRadius;
+        Vec3f inNOutspringForce = particleToCenter.normalize() * (springConstant) * distanceToSurface;
+        pattern3RForce[i] += inNOutspringForce * 0.75;
+
+        // For every other particle in the mesh system
+        // Calculating the repelling force excerted within each other
+        for (int j = i + 1; j < pattern3NumParticle; j++) {
+          Vec3f displacement = pattern3RPositionVec[j] - pattern3RPositionVec[i];
+          float distanceSquared = displacement.magSqr();
+          Vec3f repellingForce = displacement.normalize() * (0.0002 / distanceSquared);
+          pattern3RForce[i] -= repellingForce;
+          pattern3RForce[j] += repellingForce;
+        }
+
+        pattern3RForce[i] -= pattern3RVelocity[i] * dragFactor;
+        
+        // Important: add the force excerted by audio
+        // "particleHeightIndex" is a float number that is SUPPOSED to range from 0 to 10
+        // which indicates the relavant "height" the particle is in the entire sphere
+        // if the particle exceeds the sphere range, the number will be limited
+        float particleHeightIndex = (pattern3RPositionVec[i].y + pattern3SphereRadius) * 10.0 / (2.0 * pattern3SphereRadius);
+        if (particleHeightIndex < 0.0) {
+          particleHeightIndex = 0.0;
+        }
+        if (particleHeightIndex > 10.0) {
+          particleHeightIndex = 10.0;
+        }
+
+        int positionInSpectrum = 4 + std::floor(pow(particleHeightIndex, 4.0) / 10);  // maybe make the devided number a sliding parameter?
+        float musicForce = state().spectrum[positionInSpectrum];
+        float fftForce = musicForce * 0.2;
+    
+        float indexForceBoostLimit = 0.01;
+        if (fftForce > indexForceBoostLimit) {
+          fftForce = indexForceBoostLimit;
+        }
+
+        float tweetBoost = 1.5 + 8.5 * (particleHeightIndex / 10);
+
+        pattern3RForce[i] += Vec3f(pattern3RPositionVec[i].x + (-0.5 * distance), pattern3RPositionVec[i].y, pattern3RPositionVec[i].z + 2.0) * fftForce * tweetBoost * state().musicPower;
+
+        pattern3RVelocity[i] += pattern3RForce[i] / particleMass * (timeStep * 0.66);
+        pattern3RPositionVec[i] += pattern3RVelocity[i] * timeStep;
+        state().pattern3RRealTimePosition[i] = pattern3RPositionVec[i];
+
+        // Meanwhile, change its color according to its new position
+        float yIndexForColor = state().pattern3RRealTimePosition[i].y + pattern3SphereRadius;
+        if (yIndexForColor < 0.0) {
+          yIndexForColor = 0.0;
+        }
+        if (yIndexForColor > 2.0 * pattern3SphereRadius) {
+          yIndexForColor = 2.0 * pattern3SphereRadius;
+        }
+
+        float newHue = 0.7 * (yIndexForColor / (2.0 * pattern3SphereRadius));
+        state().pattern3RRealTimeColors[i] = HSV(newHue, 1.0, 1.0);
+        pattern3RParticleSphere.color(HSV(newHue, 1.0, 1.0));
 
 
       }
