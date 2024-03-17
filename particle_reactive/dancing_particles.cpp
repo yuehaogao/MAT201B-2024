@@ -1,5 +1,5 @@
 // Yuehao Gao | MAT201B
-// 2022-03-17 | Final Project
+// 2022-03-16 | Final Project
 // Audio-reactive 3D visualizer
 
 // GitHub: https://github.com/yuehaogao/MAT201B-2024_Yuehao_Gao
@@ -109,7 +109,7 @@ const float pattern2RadiusIncrement = 1.1;
 const int pattern3NumParticle = 300;    // This is the amount of particle for EACH mesh
 const float pattern3RadiusIncrement = 0.5;
 
-int frameCount = 0;                     // Mainly used for debugging
+int frameCount = 0;                     // Mainly used for debugging, also used for random pattern
 
 
 // -----------------------------------------------------------------------------
@@ -129,6 +129,7 @@ struct CommonState {
   float spectrum[FFT_SIZE / 2 + 100];      // The added number is arbitrarily decided (The spectrum for both channels)
   float spectrumL[FFT_SIZE / 2 + 100];     // The spectrum for the left channel only
   float spectrumR[FFT_SIZE / 2 + 100];     // The spectrum for the right channel only
+  float spectrumWidth;                     // The range of spectrum that the visual patterns grab data from
   float radius;                            // The radius of the cylinder / single sphere / double sphere
   float distance;                          // The distance between the mesh for left and right channel
 
@@ -175,8 +176,9 @@ struct MyApp : DistributedAppWithState<CommonState> {
   Parameter pointSize{"/pointSize", "", 0.5, 0.1, 1.5};
   Parameter pattern{"visual_pattern", 1.0, 0.0, 3.9};      // This will be limited to int only
   Parameter musicPower{"/musicPower", "", 2.5, 0.0, 6.0};
+  Parameter spectrumWidth{"/spectrumWidth", "", 1.0, 0.25, 1.5};
   Parameter timeStep{"/timeStep", "", 1.0, 0.25, 2.0};
-  Parameter springConstant{"/springConstant", "", 0.6, 0.05, 2.0};
+  Parameter springConstant{"/springConstant", "", 0.75, 0.05, 2.0};
   Parameter radius{"/radius", "", 1.0, 0.2, 2.0};
   Parameter distance{"/distance", "", 2.0, 0.5, 4.0};
 
@@ -258,6 +260,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
       state().pattern = pattern;
       gui.add(musicPower);
       state().musicPower = musicPower;
+      gui.add(spectrumWidth);
+      state().spectrumWidth = spectrumWidth;
       gui.add(timeStep);
       state().timeStep = timeStep;
       gui.add(springConstant);
@@ -563,6 +567,18 @@ struct MyApp : DistributedAppWithState<CommonState> {
       pattern2SphereRadius = pattern2RadiusIncrement * radius;
       pattern3SphereRadius = pattern3RadiusIncrement * radius;
 
+
+      // Unify other parameters between local and "state"
+      state().valueL = valueL;
+      state().valueR = valueR;
+      state().pointSize = pointSize;
+      state().musicPower = musicPower;
+      state().spectrumWidth = spectrumWidth;
+      state().timeStep = timeStep;
+      state().springConstant = springConstant;
+      state().radius = radius;
+      state().distance = distance;
+
       
       // Pattern 1: --------------------------------------------------------------------------
       // Deal with all the particle forces
@@ -581,8 +597,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
         pattern1Force[i] -= pattern1Velocity[i] * dragFactor;
       
         // Important: add the force excerted by audio
-        int positionInSpectrum = 3 + std::floor(pow(i, 2.0) / 28000);
-        //int positionInSpectrum = (int) (FFT_SIZE * 0.5 * ((pattern1PositionVec[i].y + pattern1CylinderHalfLength) / (2 * pattern1CylinderHalfLength))) - 0.5 * FFT_SIZE;
+        int positionInSpectrum = 3 + std::floor(pow(i, 1.85) / std::floor(28000.0 / spectrumWidth));
 
         float musicForce = state().spectrum[positionInSpectrum];
         float indexForceBoostLimit = 5.0;
@@ -644,7 +659,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
           particleHeightIndex = 10.0;
         }
 
-        int positionInSpectrum = 5 + std::floor(pow(particleHeightIndex, 4.0) / 12);  // maybe make the devided number a sliding parameter?
+        int positionInSpectrum = 5 + std::floor(pow(particleHeightIndex, 4.0) / std::floor(15.0 / spectrumWidth)); 
         float musicForce = state().spectrum[positionInSpectrum];
         float fftForce = musicForce * 0.1;
     
@@ -721,7 +736,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
           particleHeightIndex = 10.0;
         }
 
-        int positionInSpectrum = 4 + std::floor(pow(particleHeightIndex, 4.0) / 10);  // maybe make the devided number a sliding parameter?
+        int positionInSpectrum = 4 + std::floor(pow(particleHeightIndex, 4.0) / std::floor(12.5 / spectrumWidth));
         float musicForce = state().spectrumL[positionInSpectrum];
         float fftForce = musicForce * 0.2;
     
@@ -788,7 +803,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
           particleHeightIndex = 10.0;
         }
 
-        int positionInSpectrum = 4 + std::floor(pow(particleHeightIndex, 4.0) / 10);  // maybe make the devided number a sliding parameter?
+        int positionInSpectrum = 4 + std::floor(pow(particleHeightIndex, 4.0) / std::floor(12.5 / spectrumWidth));
         float musicForce = state().spectrum[positionInSpectrum];
         float fftForce = musicForce * 0.2;
     
@@ -829,16 +844,6 @@ struct MyApp : DistributedAppWithState<CommonState> {
       for (auto &a : pattern2Force) a.set(0);
       for (auto &a : pattern3LForce) a.set(0);
       for (auto &a : pattern3RForce) a.set(0);
-
-      // Unify other parameters between local and "state"
-      state().valueL = valueL;
-      state().valueR = valueR;
-      state().pointSize = pointSize;
-      state().musicPower = musicPower;
-      state().timeStep = timeStep;
-      state().springConstant = springConstant;
-      state().radius = radius;
-      state().distance = distance;
 
 
 
