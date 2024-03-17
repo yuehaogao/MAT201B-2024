@@ -9,10 +9,11 @@
 // Introduction
 /*
   This is my project implementing a 3D visualizer for input music files. 
-  The project brings 2 (future: 4) distinct visual patterns that moves along the input audio signal.
+  The project brings 4 distinct visual patterns that moves along the input audio signal.
   
   --- Express Shortcut Keys ---
-  [0], [1], [2]: changing visual patterns
+  [0], [1], [2], [3]: changing visual patterns
+  [4], [r]: start/pause random visual patterns
   [u], [i], [o], [k], [l]: switch between music files
   [p]: proceed to the position (0.0, 0.0, 5.0)
 
@@ -58,13 +59,14 @@
     The sizes of the particles are also determined by the enveloped signal value of the music (average of left and right channel", 
     just like how the background works. 
     The cylinder is drawn by a SINGULAR Mesh called "pattern1ParticleCylinder".
+
+
 */
 
 
 
 // ---- TO DO -----
 // FIX: spectrum L R issue
-// enable auto-changing pattern
 // express p: rotate to original as well
 // make the music selection system by "dropdown list" instead of triple express keys
 
@@ -106,13 +108,13 @@ const float pattern1RadiusIncrement = 1.2;
 const int pattern2NumParticle = 1000;
 const float pattern2RadiusIncrement = 1.1;
 
-const int pattern3NumParticle = 300;          // This is the amount of particle for EACH mesh
+const int pattern3NumParticle = 300;         // This is the amount of particle for EACH mesh
 const float pattern3RadiusIncrement = 0.5;
 
-int frameCount = 0;                           // Count the frame
-const int frameChangeThreshold = 100;        // How many frame to change a pattern automatically
-bool randomPattern = false;                   // Initially, the app should not display random pattern
-                                              // Press [p] or [4] to switch between
+int frameCount = 0;                          // Count the frame
+const int frameChangeThreshold = 90;         // How many frame to change a pattern automatically
+bool randomPattern = false;                  // Initially, the app will display random pattern
+                                             // Press [p] or [4] to pause / start again
 
 
 // -----------------------------------------------------------------------------
@@ -564,8 +566,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       int flooredPatternIndex = (int) (std::floor(pattern));
       pattern = flooredPatternIndex;
       
-
-      // If currently in random pattern, change
+      // If currently in random pattern, change to the next random pattern when time counts down
       int previousPattern = -1;
       if (randomPattern) {
         if (frameCount < frameChangeThreshold) {
@@ -585,12 +586,13 @@ struct MyApp : DistributedAppWithState<CommonState> {
       // Unify the visual pattern index
       state().pattern = pattern;
 
-
       // Unify the radius
       pattern1CylinderRadius = pattern1RadiusIncrement * radius;
       pattern2SphereRadius = pattern2RadiusIncrement * radius;
       pattern3SphereRadius = pattern3RadiusIncrement * radius;
 
+      // Let pointsize change according to the enveloped music power as well
+      pointSize = 0.1 + musicPower * 0.3 * pow((valueL + valueR), 0.4);
 
       // Unify other parameters between local and "state"
       state().valueL = valueL;
@@ -715,7 +717,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
       }
 
-      // Pattern 3L&R: --------------------------------------------------------------------------
+      // Pattern 3: --------------------------------------------------------------------------
       // Deal with all the particle forces
       vector<Vec3f> &pattern3LPositionVec(pattern3LParticleSphere.vertices());
       vector<Vec3f> &pattern3RPositionVec(pattern3RParticleSphere.vertices());
@@ -726,7 +728,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       pattern3RParticleSphere.colors().clear();
 
 
-      // Deal with each particle in the left mesh
+      // Deal with each particle in the left mesh ------------------
       for (int i = 0; i < pattern3NumParticle; i++) {
         // Add spring force to particles
         // According to their original positions and current positions
@@ -793,8 +795,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
       }
 
-      
-      // Deal with each particle in the right mesh
+      // Deal with each particle in the right mesh ------------------
       for (int i = 0; i < pattern3NumParticle; i++) {
         // Add spring force to particles
         // According to their original positions and current positions
@@ -857,11 +858,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
         state().pattern3RRealTimeColors[i] = HSV(newHue, 1.0, 1.0);
         pattern3RParticleSphere.color(HSV(newHue, 1.0, 1.0));
 
-
       }
-
-
-      pointSize = 0.1 + musicPower * 0.3 * pow((valueL + valueR), 0.4);
 
       // Clear all forces for pattern 1, 2, 3
       for (auto &a : pattern1Force) a.set(0);
@@ -879,7 +876,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       }
       for (int i = 0; i < pattern3NumParticle; i++) {
         state().pattern3LRealTimePosition[i] = pattern3LPositionVec[i]; 
-        //state().pattern3RRealTimePosition[i] = pattern3RPositionVec[i];   
+        state().pattern3RRealTimePosition[i] = pattern3RPositionVec[i];   
       }
    
     } else {
