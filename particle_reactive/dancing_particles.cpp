@@ -1,5 +1,5 @@
 // Yuehao Gao | MAT201B
-// 2022-03-16 | Final Project
+// 2022-03-17 | Final Project
 // Audio-reactive 3D visualizer
 
 // GitHub: https://github.com/yuehaogao/MAT201B-2024_Yuehao_Gao
@@ -106,10 +106,13 @@ const float pattern1RadiusIncrement = 1.2;
 const int pattern2NumParticle = 1000;
 const float pattern2RadiusIncrement = 1.1;
 
-const int pattern3NumParticle = 300;    // This is the amount of particle for EACH mesh
+const int pattern3NumParticle = 300;          // This is the amount of particle for EACH mesh
 const float pattern3RadiusIncrement = 0.5;
 
-int frameCount = 0;                     // Mainly used for debugging, also used for random pattern
+int frameCount = 0;                           // Count the frame
+const int frameChangeThreshold = 100;        // How many frame to change a pattern automatically
+bool randomPattern = false;                   // Initially, the app should not display random pattern
+                                              // Press [p] or [4] to switch between
 
 
 // -----------------------------------------------------------------------------
@@ -560,7 +563,28 @@ struct MyApp : DistributedAppWithState<CommonState> {
       // Unify local data with "state" data (only pattern)
       int flooredPatternIndex = (int) (std::floor(pattern));
       pattern = flooredPatternIndex;
+      
+
+      // If currently in random pattern, change
+      int previousPattern = -1;
+      if (randomPattern) {
+        if (frameCount < frameChangeThreshold) {
+          frameCount++;
+        } else {
+          frameCount = 0;
+          int randNextPattern = rand() % 4;
+          while(randNextPattern == previousPattern) {
+            int randNextPattern = rand() % 4;
+          }
+          pattern = randNextPattern;
+        }
+      } else {
+        frameCount = 0;
+      }
+
+      // Unify the visual pattern index
       state().pattern = pattern;
+
 
       // Unify the radius
       pattern1CylinderRadius = pattern1RadiusIncrement * radius;
@@ -846,7 +870,6 @@ struct MyApp : DistributedAppWithState<CommonState> {
       for (auto &a : pattern3RForce) a.set(0);
 
 
-
       // Tell the distributed app about the refresh of every particle
       for (int i = 0; i < pattern1NumParticle; i++) {
         state().pattern1RealTimePosition[i] = pattern1PositionVec[i];    
@@ -936,6 +959,9 @@ struct MyApp : DistributedAppWithState<CommonState> {
     if (k.key() == 'p') {
       nav().pos(0.0, 0.0, 5.0);
       // QUESTION: HOW TO MAKE THE ROTATION STRAIGHT?
+    }
+    if (k.key() == 'r' || k.key() == '4') {
+      randomPattern = !randomPattern;
     }
 
     return true; 
