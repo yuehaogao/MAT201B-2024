@@ -3,13 +3,24 @@
 
 ## MAT201B, Professor Karl Yerkes, March 2024
 
-This is the repository of my project implementing a 3D visualizer for input music files. The project brings 4 distinct visual patterns that moves along the input audio signal. There is a controllable sliding parameter named "pattern" that allows changing the visual parameter from one to another. You may also use express keys (number keys: [0], [1], [2], [3]) to change visual patterns. Additionally, express keys ([4] and [r]) will start or pause randomly-changing visual patterns.
+This is the repository of my project implementing a 3D visualizer for input music files. The project brings 4 distinct visual patterns that moves along the input audio signal. There is a controllable sliding parameter named "pattern" that allows changing the visual parameter from one to another. The major c++ file dealing with all the algorithms is the "dancing_particles.cpp", and it takes in the one of the audio files (limited to be located in the same folder) at a time using the "player()" object in the Distributed App structure. The input file will be played in loops, and limited to ".wav" only. Specifically, the input audio is acquiescently to be in stereo, meaning having two channels. In the function named "onSound", two sound samples are grabbed each time, and sent to the left and right channels separately. If not, then each sample will be sent to both the left and right channels at the same time.
 
-You may also press on [p] to locate yourself at (0, 0, 5) outside the mesh and press on [`] to get back to the center.
+------------------------------------ Introduction of Express Keys -----------------------------------
+- [0]: switch to Pattern 0
 
-The current version allows switching between input pieces with the [u], [i], [o], [k], [l] express key. In the future, it will allow a dropdown list to choose between multiple input music files.
+- [1]: switch to Pattern 1
 
-The major c++ file dealing with all the algorithms is the "dancing_particles.cpp", and it takes in the one of the audio files (limited to be located in the same folder) at a time using the "player()" object in the Distributed App structure. The input file will be played in loops, and limited to ".wav" only. Specifically, the input audio is acquiescently to be in stereo, meaning having two channels. In the function named "onSound", two sound samples are grabbed each time, and sent to the left and right channels separately. If not, then each sample will be sent to both the left and right channels at the same time.
+- [2]: switch to Pattern 2
+
+- [3]: switch to Pattern 3
+
+- [4] or [r]: start/pause auto randomly-switching patterns
+
+- [`]: back to the origin position
+
+- [p]: proceed to position (0, 0, 5)
+
+
 
 ------------------------------ Introduction of Controllable Parameters ------------------------------
 - VisualPattern (range 0-3, acquiscent: 1): controlls the current visual pattern shown to follow the music. This parameter will automatically be floored to the lower integer by the "onAnimate" fuction.
