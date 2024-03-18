@@ -6,15 +6,13 @@
 This is the repository of my project implementing a 3D visualizer for input music files. The project brings 4 distinct visual patterns that moves along the input audio signal. There is a controllable sliding parameter named "pattern" that allows changing the visual parameter from one to another. The major c++ file dealing with all the algorithms is the "dancing_particles.cpp", and it takes in the one of the audio files (limited to be located in the same folder) at a time using the "player()" object in the Distributed App structure. The input file will be played in loops, and limited to ".wav" only. Specifically, the input audio is acquiescently to be in stereo, meaning having two channels. In the function named "onSound", two sound samples are grabbed each time, and sent to the left and right channels separately. If not, then each sample will be sent to both the left and right channels at the same time.
 
 ------------------------------------ Introduction of Express Keys -----------------------------------
-- [0]: switch to Pattern 0
-
-- [1]: switch to Pattern 1
-
-- [2]: switch to Pattern 2
-
-- [3]: switch to Pattern 3
+- [0], [1], [2], [3]: switch to Pattern 0, 1, 2, 3 respectively
 
 - [4] or [r]: start/pause auto randomly-switching patterns
+
+- [, (<)]: switch to the previous song
+
+- [. (>)]: switch to the next song
 
 - [`]: back to the origin position
 
@@ -23,7 +21,9 @@ This is the repository of my project implementing a 3D visualizer for input musi
 
 
 ------------------------------ Introduction of Controllable Parameters ------------------------------
-- VisualPattern (range 0-3, acquiscent: 1): controlls the current visual pattern shown to follow the music. This parameter will automatically be floored to the lower integer by the "onAnimate" fuction.
+- VisualPattern (range 0-3, acquiscent: 1): controlls the current visual pattern shown to follow the music. This parameter will automatically be floored to the lower integer by the "onAnimate" fuction. Alternative for this parameter is the number key [0], [1], [2], [3].
+  
+- Song (range 0-3, acquiscent: 0): controlls the current song played. This parameter will automatically be floored to the lower integer by the "onAnimate" fuction. Alternative for this parameter is the key [,] or [.].
 
 - MusicPower (range 0-6, acquiscent: 2.5): how strong the music affects the visual patterns, you may understand this parameter as "music volume".
 
