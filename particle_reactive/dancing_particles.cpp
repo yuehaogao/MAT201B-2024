@@ -22,6 +22,10 @@
     controlls the current visual pattern shown to follow the music. 
     This parameter will automatically be floored to the lower integer by the "onAnimate" fuction.
 
+  Song (range 0 - 3, acquiscent: 0): 
+    controlls which music is played.
+    This parameter will automatically be floored to the lower integer by the "onAnimate" fuction.
+
   MusicPower (range 0 - 6, acquiscent: 3): 
     how strong the music affects the visual patterns,
     you may understand this parameter as "music volume".
@@ -142,6 +146,8 @@ const int frameChangeThreshold = 90;         // How many frame to change a patte
 bool randomPattern = false;                  // Initially, the app will display random pattern
                                              // Press [p] or [4] to pause / start again
 
+int startedPlaying;                          // Did the music file started playing
+
 
 // -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
@@ -151,6 +157,7 @@ struct CommonState {
   // Public parameters for all patterns
   Pose pose;                               // The position and angel of the "camera"
   int pattern;                             // The visual pattern, either being 0, 1, 2, or 3
+  int song;                                // Which song it plays, either being 0, 1, 2, or 3
   float valueL;                            // Envelopsed right channel value
   float valueR;                            // Enveloped left channel value
   float musicPower;                        // The "volume" of music: how much the music affect visual patterns
@@ -202,10 +209,11 @@ string slurp(string fileName);  // forward declaration
 
 struct MyApp : DistributedAppWithState<CommonState> {
   // ----------- All parameters Start -----------
-  Parameter valueL{"value_left", 0, 0, 1};
-  Parameter valueR{"value_right", 0, 0, 1};
+  Parameter valueL{"/value_left", 0, 0, 1};
+  Parameter valueR{"/value_right", 0, 0, 1};
   Parameter pointSize{"/pointSize", "", 0.5, 0.1, 1.5};
-  Parameter pattern{"visual_pattern", 1.0, 0.0, 3.9};      // This will be limited to int only
+  Parameter pattern{"/visual_pattern", 1.0, 0.0, 3.9};      // This will be limited to int only
+  Parameter song{"/song", 0.0, 0.0, 3.9};                   // This will be limited to int only
   Parameter musicPower{"/musicPower", "", 2.5, 0.0, 6.0};
   Parameter spectrumWidth{"/spectrumWidth", "", 1.0, 0.25, 1.5};
   Parameter timeStep{"/timeStep", "", 1.0, 0.25, 2.0};
@@ -276,6 +284,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
     if (isPrimary()) {
       // Load the sound file
+      startedPlaying = true;
       player.load("../wav_files/Dancin.wav");
     
       // set up GUI
@@ -289,6 +298,8 @@ struct MyApp : DistributedAppWithState<CommonState> {
       state().pointSize = pointSize;
       gui.add(pattern);
       state().pattern = pattern;
+      gui.add(song);
+      state().song = song;
       gui.add(musicPower);
       state().musicPower = musicPower;
       gui.add(spectrumWidth);
@@ -388,7 +399,6 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
     // Pattern 3:
     pattern3SphereRadius = radius * pattern3RadiusIncrement;
-
 
     for (int p3li = 0; p3li < pattern3NumParticle; p3li++) {
 
@@ -587,10 +597,12 @@ struct MyApp : DistributedAppWithState<CommonState> {
       // Update the camera position
       state().pose = nav();
 
-      // Set the parameter of "pattern" to its floored-down int value
+      // Set the parameter of "pattern" and "song" to its floored-down int value
       // Unify local data with "state" data (only pattern)
       int flooredPatternIndex = (int) (std::floor(pattern));
       pattern = flooredPatternIndex;
+      int flooredSongIndex = (int) (std::floor(song));
+      song = flooredSongIndex;
       
       // If currently in random pattern, change to the next random pattern when time counts down
       int previousPattern = -1;
@@ -611,6 +623,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
       // Unify the visual pattern index
       state().pattern = pattern;
+      state().song = song;
 
       // Unify the radius
       pattern1CylinderRadius = pattern1RadiusIncrement * radius;
@@ -904,6 +917,22 @@ struct MyApp : DistributedAppWithState<CommonState> {
         state().pattern3LRealTimePosition[i] = pattern3LPositionVec[i]; 
         state().pattern3RRealTimePosition[i] = pattern3RPositionVec[i];   
       }
+
+
+      // ---------------------------------------------------------
+      // Finally, change the music if found the "song" parameter changed
+      if (!startedPlaying) {
+        if (song >= 0.0 && song < 1.0) {
+          player.load("../wav_files/Dancin.wav");
+        } else if (song >= 1.0 && song < 2.0) {
+          player.load("../wav_files/Tu_Vivi_Nellaria.wav");
+        } else if (song >= 2.0 && song < 3.0) {
+          player.load("../wav_files/Seven_Nation_Army.wav");
+        } else {
+          player.load("../wav_files/California_Dreaming.wav");
+        }
+        startedPlaying = true;
+      }
    
     } else {
       // Unify the position and hue of distributed app
@@ -964,20 +993,19 @@ struct MyApp : DistributedAppWithState<CommonState> {
     if (k.key() == '3') {
       pattern = 3;
     }
-    if (k.key() == 'u') {
-      player.load("../tv.mp3");
+    if (k.key() == ',') {
+      int flooredSong = (int) (std::floor(song));
+      if (flooredSong > 0) {
+        song = song - 1.0;
+        startedPlaying = false;
+      }
     }
-    if (k.key() == 'i') {
-      player.load("../cd.mp3");
-    }
-    if (k.key() == 'o') {
-      player.load("../lf.mp3");
-    }
-    if (k.key() == 'k') {
-      player.load("../dc.mp3");
-    }
-    if (k.key() == 'l') {
-      player.load("../it.mp3");
+    if (k.key() == '.') {
+      int flooredSong = (int) (std::floor(song));
+      if (flooredSong < 3) {
+        song = song + 1.0;
+        startedPlaying = false;
+      }
     }
     if (k.key() == 'p') {
       nav().pos(0.0, 0.0, 5.0);
