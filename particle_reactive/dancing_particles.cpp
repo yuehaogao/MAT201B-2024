@@ -96,9 +96,8 @@
 
 
 // ---- TO DO -----
-// FIX: spectrum L R issue
+// FIX: spectrum L R issue / then go to line 782 to change "spectrum" to "spectrumR"
 // express p: rotate to original as well
-// make the music selection system by "dropdown list" instead of triple express keys
 
 
 
@@ -146,7 +145,8 @@ const int frameChangeThreshold = 90;         // How many frame to change a patte
 bool randomPattern = false;                  // Initially, the app will display random pattern
                                              // Press [p] or [4] to pause / start again
 
-int startedPlaying;                          // Did the music file started playing
+bool startedPlaying;                         // Did the music file started playing
+int previousSong;                              
 
 
 // -----------------------------------------------------------------------------
@@ -286,6 +286,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
       // Load the sound file
       startedPlaying = true;
       player.load("../wav_files/Dancin.wav");
+      previousSong = 0;
     
       // set up GUI
       auto GUIdomain = GUIDomain::enableGUI(defaultWindowDomain());
@@ -921,15 +922,22 @@ struct MyApp : DistributedAppWithState<CommonState> {
 
       // ---------------------------------------------------------
       // Finally, change the music if found the "song" parameter changed
+      if (song != previousSong) {
+        startedPlaying = false;
+      }
       if (!startedPlaying) {
         if (song >= 0.0 && song < 1.0) {
           player.load("../wav_files/Dancin.wav");
+          previousSong = 0;
         } else if (song >= 1.0 && song < 2.0) {
           player.load("../wav_files/Tu_Vivi_Nellaria.wav");
+          previousSong = 1;
         } else if (song >= 2.0 && song < 3.0) {
           player.load("../wav_files/Seven_Nation_Army.wav");
+          previousSong = 2;
         } else {
           player.load("../wav_files/California_Dreaming.wav");
+          previousSong = 3;
         }
         startedPlaying = true;
       }
@@ -997,14 +1005,12 @@ struct MyApp : DistributedAppWithState<CommonState> {
       int flooredSong = (int) (std::floor(song));
       if (flooredSong > 0) {
         song = song - 1.0;
-        startedPlaying = false;
       }
     }
     if (k.key() == '.') {
       int flooredSong = (int) (std::floor(song));
       if (flooredSong < 3) {
         song = song + 1.0;
-        startedPlaying = false;
       }
     }
     if (k.key() == 'p') {
