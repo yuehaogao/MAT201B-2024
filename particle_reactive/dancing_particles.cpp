@@ -14,7 +14,7 @@
   --- Express Shortcut Keys ---
   [0], [1], [2], [3]: changing visual patterns
   [4], [r]: start/pause random visual patterns
-  [u], [i], [o], [k], [l]: switch between music files
+  [`]: back to original position (0.0, 0.0, 0.0)
   [p]: proceed to the position (0.0, 0.0, 5.0)
 
   --- Controllable Parameters ---
@@ -26,6 +26,15 @@
     how strong the music affects the visual patterns,
     you may understand this parameter as "music volume".
     used for pattern {0, 1, 2, 3}.
+  
+  SpectrumWidth(range 0.25-1.5, acquiscent: 1.0): 
+    from the fixed lowest frequency value on the spectrum, 
+    how large is the range of frequency-amplitude values this pattern grabs from the spectrum. 
+    The larger the number is, the narrower the "dancing bass" will be, 
+    but you shall see more particles on the top dancing to higher frequencies.
+
+  TimeStep(range 0.25-2.0, acquiscent: 1.0): 
+    how fast the particles move.
 
   SpringConstant (range 0.05 - 2, acquiscent: 0.6): 
     how stiff the spring is, 
@@ -34,6 +43,10 @@
   Radius (range 0.2 - 2, acquiscent: 1): 
     the radius of all the patterns, 
     used for pattern {0, 1, 2, 3}.
+
+  Distance (range 0.5-4, acquiscent: 2): 
+    the distance between the mesh for left and right channels. 
+    Changing this will only affect pattern {0, 3}.
 
   --- Visuals ---
   Background: 
@@ -59,7 +72,20 @@
     The sizes of the particles are also determined by the enveloped signal value of the music (average of left and right channel", 
     just like how the background works. 
     The cylinder is drawn by a SINGULAR Mesh called "pattern1ParticleCylinder".
+  
+  Pattern 2 (Express key [2]):
+    a SINGULAR hollow sphere made by particles that dances according to the spectrum of the FFT of the input audio. 
+    The lower to higher part of this mesh also dance differently according to different values on the spectrum table. 
+    The particles will be pushed towards outward by the music force. 
+    It may also be controlled by musicPower. The sphere is drawn by a SINGULAR Mesh called "pattern2SphereCylinder".
 
+  Pattern 3 (Express key [3]): 
+    a PAIR OF hollow spheres made by particles that dances separately according to the left and right channel spectrum 
+    of the FFT of the input audio. 
+    The lower to higher part of these two mesh also dance differently according to different values on the left and right spectrum table. 
+    The particles will be pushed towards outward by the music force. 
+    They may also be controlled by musicPower. 
+    The spheres are drawn by a PAIR OF Meshes separately called "pattern3LSphereCylinder" and "pattern3RSphereCylinder".
 
 */
 
@@ -575,7 +601,7 @@ struct MyApp : DistributedAppWithState<CommonState> {
           frameCount = 0;
           int randNextPattern = rand() % 4;
           while(randNextPattern == previousPattern) {
-            int randNextPattern = rand() % 4;
+            randNextPattern = rand() % 4;
           }
           pattern = randNextPattern;
         }
