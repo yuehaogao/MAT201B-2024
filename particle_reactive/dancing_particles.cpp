@@ -5,7 +5,6 @@
 // GitHub: https://github.com/yuehaogao/MAT201B-2024_Yuehao_Gao
 // Full Introduction: https://github.com/yuehaogao/MAT201B-2024_Yuehao_Gao/blob/main/README.md
 
-
 // Introduction
 /*
   This is my project implementing a 3D visualizer for input music files. 
